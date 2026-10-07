@@ -1,0 +1,3 @@
+expressjs:
+1. why separate app.ts and server.ts? how would this split help writing test? how would Supertest take advantage of this structure?
+2. 
