@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "typecheck": "tsc --noEmit",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "tsc -p tsconfig.build.json",
@@ -29,6 +31,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.4",
     "@types/supertest": "^7.2.1",
+    "prettier": "^3.9.9",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
