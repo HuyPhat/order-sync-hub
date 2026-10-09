@@ -30,13 +30,10 @@ describe('config', () => {
     expect((await loadConfig()).port).toBe(port);
   });
 
-  it.each(['abc', '99999', '-1', '30.5', 'Infinity'])(
-    'throws for invalid PORT %s',
-    async (bad) => {
-      vi.stubEnv('PORT', bad);
-      await expect(loadConfig()).rejects.toThrow(/Invalid PORT/);
-    },
-  );
+  it.each(['abc', '99999', '-1', '30.5', 'Infinity'])('throws for invalid PORT %s', async (bad) => {
+    vi.stubEnv('PORT', bad);
+    await expect(loadConfig()).rejects.toThrow(/Invalid PORT/);
+  });
 
   it('uses NODE_ENV when provided', async () => {
     vi.stubEnv('NODE_ENV', 'production');
@@ -44,7 +41,13 @@ describe('config', () => {
   });
 
   it('defaults db settings to the docker-compose values', async () => {
-    for (const key of ['MYSQL_HOST', 'MYSQL_PORT', 'MYSQL_DATABASE', 'MYSQL_USER', 'MYSQL_PASSWORD']) {
+    for (const key of [
+      'MYSQL_HOST',
+      'MYSQL_PORT',
+      'MYSQL_DATABASE',
+      'MYSQL_USER',
+      'MYSQL_PASSWORD',
+    ]) {
       vi.stubEnv(key, '');
     }
     expect((await loadConfig()).db).toEqual({
