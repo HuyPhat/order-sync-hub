@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { SequelizeStorage, Umzug } from 'umzug';
+import { migrationName } from './migration-name.js';
 import { sequelize } from './sequelize.js';
 
 const migrationsDir = join(import.meta.dirname, 'migrations');
@@ -11,7 +12,7 @@ export const migrator = new Umzug({
     glob: ['*.{ts,js}', { cwd: migrationsDir, ignore: ['*.d.ts'] }],
     // Load with import() so ESM migrations work (umzug's default uses require()).
     resolve: ({ name, path, context }) => ({
-      name,
+      name: migrationName(name),
       up: async () => (await import(pathToFileURL(path!).href)).up({ context }),
       down: async () => (await import(pathToFileURL(path!).href)).down({ context }),
     }),
