@@ -1,5 +1,5 @@
-import { sequelize } from './src/db/sequelize.js';
-import { Product } from './src/models/product.js';
+import { sequelize } from '../src/db/sequelize.js';
+import { Product } from '../src/models/product.js';
 
 const t = await sequelize.transaction();
 try {
