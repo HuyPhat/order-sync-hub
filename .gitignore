@@ -3,3 +3,4 @@ docs
 interviews
 dist
 .codegraph
+.env
