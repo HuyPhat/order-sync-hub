@@ -23,6 +23,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "decimal.js": "^10.6.0",
     "express": "^5.2.1",
     "mysql2": "^3.24.5",
     "sequelize": "^6.37.8",
