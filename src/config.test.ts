@@ -78,4 +78,39 @@ describe('config', () => {
     vi.stubEnv('MYSQL_PORT', 'abc');
     await expect(loadConfig()).rejects.toThrow(/Invalid MYSQL_PORT/);
   });
+
+  it.each(['', ' ', '   '])('treats %j as unset and uses the defaults', async (blank) => {
+    vi.stubEnv('PORT', blank);
+    vi.stubEnv('MYSQL_PORT', blank);
+    const config = await loadConfig();
+    expect(config.port).toBe(3000);
+    expect(config.db.port).toBe(3306);
+  });
+
+  it('ignores spaces around a valid port', async () => {
+    vi.stubEnv('PORT', '  8080  ');
+    vi.stubEnv('MYSQL_PORT', ' 3307 ');
+    const config = await loadConfig();
+    expect(config.port).toBe(8080);
+    expect(config.db.port).toBe(3307);
+  });
+
+  it.each(['0x1F', '1e3', '+80', '3.0', '8080abc'])(
+    'rejects the non-decimal value %s',
+    async (bad) => {
+      vi.stubEnv('PORT', bad);
+      await expect(loadConfig()).rejects.toThrow(/Invalid PORT/);
+      vi.stubEnv('PORT', '');
+      vi.stubEnv('MYSQL_PORT', bad);
+      await expect(loadConfig()).rejects.toThrow(/Invalid MYSQL_PORT/);
+    },
+  );
+
+  it('allows an explicit PORT=0 (the OS picks a port) but not MYSQL_PORT=0', async () => {
+    vi.stubEnv('PORT', '0');
+    expect((await loadConfig()).port).toBe(0);
+    vi.stubEnv('PORT', '');
+    vi.stubEnv('MYSQL_PORT', '0');
+    await expect(loadConfig()).rejects.toThrow(/Invalid MYSQL_PORT/);
+  });
 });
