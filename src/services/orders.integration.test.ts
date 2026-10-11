@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sequelize } from '../db/sequelize.js';
 import { Order, OrderItem, Product } from '../models/index.js';
-import { ProductNotFoundError, createOrder } from './orders.js';
+import { InvalidOrderError, ProductNotFoundError, createOrder } from './orders.js';
 
 // Runs against the TEST database (see vitest.integration.config.ts), never the dev database.
 async function counts() {
@@ -95,17 +95,46 @@ describe('createOrder', () => {
 
   it('rolls everything back when MySQL itself rejects an item', async () => {
     const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
-    const gadget = await Product.create({ sku: 'G-1', name: 'Gadget', price: '1.00' });
+    const before = await counts();
+    const insertOrder = vi.spyOn(Order, 'create');
+    // Let the real INSERT run, but point the item at a product that does not exist, so MySQL's
+    // foreign key rejects it after the order row has already been written.
+    const realBulkCreate = OrderItem.bulkCreate.bind(OrderItem);
+    vi.spyOn(OrderItem, 'bulkCreate').mockImplementation(((rows: Array<object>, options: object) =>
+      realBulkCreate(
+        rows.map((row) => ({ ...row, productId: 999_999_999 })) as never,
+        options as never,
+      )) as never);
+
+    await expect(createOrder([{ productId: widget.id, quantity: 1 }])).rejects.toMatchObject({
+      name: 'SequelizeForeignKeyConstraintError',
+    });
+
+    expect(insertOrder).toHaveBeenCalledTimes(1); // the order row was written first...
+    expect(await counts()).toEqual(before); // ...and rolled back
+  });
+
+  it('rejects an order whose total is too large for the column, and saves nothing', async () => {
+    const pricey = await Product.create({ sku: 'P-1', name: 'Pricey', price: '99999999.99' });
     const before = await counts();
 
-    // 4294967296 passes validation but overflows the INT UNSIGNED column on insert.
-    await expect(
-      createOrder([
-        { productId: widget.id, quantity: 1 },
-        { productId: gadget.id, quantity: 4294967296 },
-      ]),
-    ).rejects.toThrow();
+    // 101 x 99999999.99 = 10099999999.99, above the 9999999999.99 the total column can hold.
+    await expect(createOrder([{ productId: pricey.id, quantity: 101 }])).rejects.toBeInstanceOf(
+      InvalidOrderError,
+    );
 
     expect(await counts()).toEqual(before);
+  });
+
+  it('accepts the largest total the column can hold', async () => {
+    const pricey = await Product.create({ sku: 'P-1', name: 'Pricey', price: '99999999.99' });
+    const order = await createOrder([{ productId: pricey.id, quantity: 100 }]);
+    expect(order.total).toBe('9999999999.00');
+  });
+
+  it('accepts the largest quantity the column can hold', async () => {
+    const free = await Product.create({ sku: 'F-1', name: 'Free', price: '0.00' });
+    const order = await createOrder([{ productId: free.id, quantity: 4294967295 }]);
+    expect(order.items?.[0]?.quantity).toBe(4294967295);
   });
 });

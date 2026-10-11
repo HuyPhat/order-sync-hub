@@ -18,7 +18,14 @@ export class ProductNotFoundError extends Error {
   }
 }
 
-const isPositiveInteger = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1;
+// What the columns can hold: order_items.quantity is INT UNSIGNED, orders.total is DECIMAL(12,2).
+// Checked here so a too-large order is rejected before any write, whatever the server's sql_mode
+// (a non-strict MySQL would silently clamp an out-of-range value instead of failing).
+const MAX_QUANTITY = 4_294_967_295;
+const MAX_TOTAL = '9999999999.99';
+
+const isPositiveInteger = (n: unknown): n is number =>
+  Number.isSafeInteger(n) && (n as number) >= 1;
 
 // Checks the input and merges repeated products into one line (quantities add up).
 function normalizeLines(lines: OrderLine[]): OrderLine[] {
@@ -29,7 +36,10 @@ function normalizeLines(lines: OrderLine[]): OrderLine[] {
     if (!isPositiveInteger(productId))
       throw new InvalidOrderError(`Invalid productId: ${productId}`);
     if (!isPositiveInteger(quantity)) throw new InvalidOrderError(`Invalid quantity: ${quantity}`);
-    merged.set(productId, (merged.get(productId) ?? 0) + quantity);
+    const total = (merged.get(productId) ?? 0) + quantity;
+    if (total > MAX_QUANTITY)
+      throw new InvalidOrderError(`Quantity for product ${productId} exceeds ${MAX_QUANTITY}`);
+    merged.set(productId, total);
   }
   return [...merged].map(([productId, quantity]) => ({ productId, quantity }));
 }
@@ -56,12 +66,12 @@ export async function createOrder(lines: OrderLine[]): Promise<Order> {
       quantity: line.quantity,
       unitPrice: priceById.get(line.productId) as string,
     }));
-    const total = items
-      .reduce(
-        (sum, item) => sum.plus(new Decimal(item.unitPrice).times(item.quantity)),
-        new Decimal(0),
-      )
-      .toFixed(2);
+    const sum = items.reduce(
+      (running, item) => running.plus(new Decimal(item.unitPrice).times(item.quantity)),
+      new Decimal(0),
+    );
+    if (sum.gt(MAX_TOTAL)) throw new InvalidOrderError(`Order total exceeds ${MAX_TOTAL}`);
+    const total = sum.toFixed(2);
 
     const order = await Order.create({ status: 'pending', total }, { transaction });
     await OrderItem.bulkCreate(
