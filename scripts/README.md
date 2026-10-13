@@ -8,6 +8,7 @@ the app itself.
 | [`smoke.sh`](#smokesh) | The built server boots and `/health` answers | No | CI (`run` job), by hand |
 | [`verify-product.ts`](#verify-productts) | The `Product` model works against the real `products` table | Yes | By hand |
 | [`check-health-db.sh`](#check-health-dbsh) | `/health/db` returns the right status when the database is broken in four ways | Yes (2 of 4 scenarios) | By hand |
+| [`create-test-db.sh`](#create-test-dbsh) | Creates the `order_sync_hub_test` database used by `pnpm test:integration` | Yes | Once, by hand |
 
 Most of them need the project built first (`pnpm build`) and, where noted, MySQL running
 (`docker compose up -d`, then wait for `(healthy)` in `docker compose ps`).
@@ -173,6 +174,20 @@ Server-side logs show the cause, for example:
 database health check failed: AccessDeniedError [SequelizeAccessDeniedError]: Access denied for user 'app'...
 database health check failed: Error: database check timed out after 2000ms
 ```
+
+---
+
+## create-test-db.sh
+
+Creates the database `order_sync_hub_test` and grants the app user access to it. Run it once; it is safe to run again. The app user cannot create databases itself, so the script runs as root inside the MySQL container.
+
+```bash
+docker compose up -d
+bash scripts/create-test-db.sh
+pnpm test:integration
+```
+
+`pnpm test:integration` runs every `src/**/*.integration.test.ts` file against that database. Before each run it reverts and re-applies all migrations, so the database always starts clean. It refuses to run unless the database name ends in `_test`. `pnpm test` never runs these files and needs no database.
 
 ---
 
