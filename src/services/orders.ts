@@ -18,6 +18,13 @@ export class ProductNotFoundError extends Error {
   }
 }
 
+export class OrderNotFoundError extends Error {
+  override name = 'OrderNotFoundError';
+  constructor(readonly orderId: number) {
+    super(`Order ${orderId} not found`);
+  }
+}
+
 // What the columns can hold: order_items.quantity is INT UNSIGNED, orders.total is DECIMAL(12,2).
 // Checked here so a too-large order is rejected before any write, whatever the server's sql_mode
 // (a non-strict MySQL would silently clamp an out-of-range value instead of failing).
@@ -81,4 +88,10 @@ export async function createOrder(lines: OrderLine[]): Promise<Order> {
 
     return order.reload({ include: 'items', transaction });
   });
+}
+
+export async function getOrder(id: number): Promise<Order> {
+  const order = await Order.findByPk(id, { include: 'items', order: [['items', 'id', 'ASC']] });
+  if (!order) throw new OrderNotFoundError(id);
+  return order;
 }
