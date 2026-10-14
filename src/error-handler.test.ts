@@ -72,18 +72,23 @@ describe('errorHandler: errors from the body parser', () => {
   });
 });
 
+describe('errorHandler: framework 4xx errors without an expose flag', () => {
+  it.each([
+    ['without an expose flag', { status: 400 }],
+    ['even when it says not to show its message', { status: 400, expose: false }],
+  ])('passes a 4xx error %s through as a fixed "Bad Request"', async (_name, props) => {
+    const error = Object.assign(new URIError('secret decode detail'), props);
+    const res = await request(appThatThrows(error)).get('/boom');
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ status: 'error', message: 'Bad Request' });
+    expect(res.text).not.toMatch(/secret/);
+  });
+});
+
 describe('errorHandler: everything else is a 500 that leaks nothing', () => {
   it.each([
     ['an Error with SQL detail', new Error("secret: SELECT * FROM `orders` WHERE password='x'")],
     ['a thrown string', 'secret string'],
-    [
-      'a 4xx error that says it must not be shown',
-      Object.assign(new Error('secret'), { status: 400, expose: false }),
-    ],
-    [
-      'a client-looking error that is not exposable',
-      Object.assign(new Error('secret'), { status: 400 }),
-    ],
     [
       'a 5xx error even if it claims to be exposable',
       Object.assign(new Error('secret'), { status: 503, expose: true }),

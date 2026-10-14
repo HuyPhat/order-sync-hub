@@ -3,11 +3,11 @@ import { STATUS_CODES } from 'node:http';
 import { ZodError } from 'zod';
 import { InvalidOrderError, OrderNotFoundError, ProductNotFoundError } from './services/orders.js';
 
-// body-parser (and other Express internals) throw errors that carry a status and say whether the
-// client may see them. Only those are passed through, and only with a fixed message.
+// body-parser and Express's router throw errors that carry a 4xx status (a bad body, a URL that
+// cannot be decoded). Those are the client's mistake, so they pass through as that status, and only
+// with a fixed message: the error's own text is never sent.
 interface ClientError {
   status: number;
-  expose: true;
   type?: string;
 }
 
@@ -17,9 +17,7 @@ const isClientError = (err: unknown): err is ClientError =>
   'status' in err &&
   typeof err.status === 'number' &&
   err.status >= 400 &&
-  err.status < 500 &&
-  'expose' in err &&
-  err.expose === true;
+  err.status < 500;
 
 const FIXED_MESSAGES: Record<string, string> = {
   'entity.parse.failed': 'Invalid JSON',

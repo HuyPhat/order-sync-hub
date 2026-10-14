@@ -46,6 +46,36 @@ describe('POST /orders then GET /orders/:id', () => {
   });
 });
 
+describe('the fields a client receives', () => {
+  it('are exactly these, so a column added later never reaches clients by accident', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
+    const created = await request(app)
+      .post('/orders')
+      .send({ items: [{ productId: widget.id, quantity: 1 }] });
+    const fetched = await request(app).get(`/orders/${created.body.id}`);
+
+    for (const body of [created.body, fetched.body]) {
+      expect(Object.keys(body).sort()).toEqual([
+        'createdAt',
+        'id',
+        'items',
+        'status',
+        'total',
+        'updatedAt',
+      ]);
+      expect(Object.keys(body.items[0]).sort()).toEqual([
+        'createdAt',
+        'id',
+        'orderId',
+        'productId',
+        'quantity',
+        'unitPrice',
+        'updatedAt',
+      ]);
+    }
+  });
+});
+
 describe('POST /orders with an unknown product', () => {
   it('answers 422 and saves nothing', async () => {
     const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });

@@ -177,6 +177,13 @@ describe('GET /orders/:id', () => {
     },
   );
 
+  it('rejects an id with a broken percent-encoding with 400, not a server error', async () => {
+    const res = await request(app).get('/orders/%E0%A4%A');
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ status: 'error', message: 'Bad Request' });
+    expect(getOrderMock).not.toHaveBeenCalled();
+  });
+
   it('maps OrderNotFoundError to 404', async () => {
     getOrderMock.mockRejectedValue(new OrderNotFoundError(99));
     const res = await request(app).get('/orders/99');
