@@ -1,4 +1,4 @@
-import type { ErrorRequestHandler } from 'express';
+import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { ZodError } from 'zod';
 import { InvalidOrderError, OrderNotFoundError, ProductNotFoundError } from './services/orders.js';
@@ -23,6 +23,23 @@ const FIXED_MESSAGES: Record<string, string> = {
   'entity.parse.failed': 'Invalid JSON',
   'entity.too.large': 'Request body too large',
 };
+
+// No route matched. Mounted after every route and before errorHandler, so an unknown path gets the
+// same JSON error shape instead of Express's HTML page. The path and method are never echoed back.
+export const notFound: RequestHandler = (_req, res) => {
+  res.status(404).json({ status: 'error', message: 'Not Found' });
+};
+
+// For a path that exists but not with this method. Chain it with `.all()` after the route's real
+// handlers: Express only reaches it for the methods they did not take.
+export const methodNotAllowed =
+  (...allowed: string[]): RequestHandler =>
+  (req, res) => {
+    res.set('Allow', allowed.join(', '));
+    // `.all()` also catches OPTIONS, which Express would otherwise answer itself.
+    if (req.method === 'OPTIONS') return void res.sendStatus(204);
+    res.status(405).json({ status: 'error', message: 'Method Not Allowed' });
+  };
 
 // Last middleware: the one place that decides what the client is told about a failure.
 export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {

@@ -1,5 +1,6 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
+import { methodNotAllowed } from '../error-handler.js';
 import { createOrder, getOrder } from '../services/orders.js';
 
 // Shape only. The quantity and total ceilings, and merging repeated products, stay in the service.
@@ -22,11 +23,17 @@ export const ordersRouter: Router = Router();
 // Only /orders parses bodies, so /health never fails on a bad JSON body.
 ordersRouter.use(express.json());
 
-ordersRouter.post('/', async (req, res) => {
-  const { items } = createOrderBody.parse(req.body);
-  res.status(201).json(await createOrder(items));
-});
+ordersRouter
+  .route('/')
+  .post(async (req, res) => {
+    const { items } = createOrderBody.parse(req.body);
+    res.status(201).json(await createOrder(items));
+  })
+  .all(methodNotAllowed('POST'));
 
-ordersRouter.get('/:id', async (req, res) => {
-  res.json(await getOrder(orderId.parse(req.params.id)));
-});
+ordersRouter
+  .route('/:id')
+  .get(async (req, res) => {
+    res.json(await getOrder(orderId.parse(req.params.id)));
+  })
+  .all(methodNotAllowed('GET', 'HEAD'));

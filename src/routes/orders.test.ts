@@ -207,6 +207,6 @@ describe('body parsing is limited to /orders', () => {
       .post('/health')
       .set('Content-Type', 'application/json')
       .send('{bad');
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(405);
   });
 });
