@@ -198,7 +198,7 @@ pnpm test:integration
 | `dist/server.js not found` (check-health-db) | Run `pnpm build`. |
 | `smoke.sh` ends with `server did not become healthy` | The build is missing or broken: run `pnpm build`, then start `node dist/server.js` by hand to see the error. |
 | `.env not found` | Copy `.env.example` to `.env` and set the passwords. |
-| `MYSQL_PASSWORD is not set` (migration CLI or server startup) | The variable is empty or missing. Set it in `.env` (see `.env.example`) or the environment. Only `NODE_ENV` `development` and `test` let the server start without it. |
+| `MYSQL_PASSWORD is not set` (migration CLI or server startup) | The variable is empty or missing. Set it in `.env` (see `.env.example`) or the environment. Only `NODE_ENV` `development` and `test` let the server start without it (an unset `NODE_ENV` counts as `development`, so set it in deployments). |
 | `Something is already listening on port ...` | Another server uses that port. Use `PORT=3191 bash scripts/check-health-db.sh`. |
 | `verify-product.ts`: "Table ... doesn't exist" | Run `pnpm db:migrate`. |
 | `verify-product.ts` or the control scenario cannot connect | MySQL is not running or not healthy yet: `docker compose ps`. Check `MYSQL_PASSWORD` in `.env` matches the one the database volume was created with. |
