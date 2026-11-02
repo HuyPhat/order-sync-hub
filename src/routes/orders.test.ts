@@ -44,6 +44,14 @@ describe('POST /orders', () => {
     expect(createOrderMock).toHaveBeenCalledWith([{ productId: 3, quantity: 2 }]);
   });
 
+  it('points Location at the new order', async () => {
+    createOrderMock.mockResolvedValue(savedOrder);
+    const res = await request(app)
+      .post('/orders')
+      .send({ items: [{ productId: 3, quantity: 2 }] });
+    expect(res.headers['location']).toBe('/orders/1');
+  });
+
   it('passes a repeated product through unchanged, because the service merges them', async () => {
     createOrderMock.mockResolvedValue(savedOrder);
     const items = [

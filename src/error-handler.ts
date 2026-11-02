@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { STATUS_CODES } from 'node:http';
+import { AccessDeniedError, ConnectionError, InvalidConnectionError } from 'sequelize';
 import { ZodError } from 'zod';
 import { InvalidOrderError, OrderNotFoundError, ProductNotFoundError } from './services/orders.js';
 
@@ -23,6 +24,17 @@ const FIXED_MESSAGES: Record<string, string> = {
   'entity.parse.failed': 'Invalid JSON',
   'entity.too.large': 'Request body too large',
 };
+
+// MySQL could not be reached (refused, timed out, no route, pool exhausted). It fails before the
+// transaction starts, so nothing was written and a retry is safe. Bad credentials and an invalid
+// connection setup are our own misconfiguration: a retry never helps, so they stay a 500.
+// A connection lost mid-query is a plain DatabaseError and stays a 500 too: the write may have
+// committed, and a 503 would invite a retry that duplicates the order.
+const isDatabaseUnreachable = (err: unknown) =>
+  err instanceof ConnectionError &&
+  !(err instanceof AccessDeniedError || err instanceof InvalidConnectionError);
+
+const RETRY_AFTER_SECONDS = '5';
 
 // No route matched. Mounted after every route and before errorHandler, so an unknown path gets the
 // same JSON error shape instead of Express's HTML page. The path and method are never echoed back.
@@ -63,6 +75,12 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
       err.status,
       FIXED_MESSAGES[err.type ?? ''] ?? STATUS_CODES[err.status] ?? 'Bad Request',
     );
+  }
+
+  if (isDatabaseUnreachable(err)) {
+    console.error('Database unreachable:', err);
+    res.set('Retry-After', RETRY_AFTER_SECONDS);
+    return send(503, 'Service Unavailable');
   }
 
   console.error('Unhandled request error:', err);

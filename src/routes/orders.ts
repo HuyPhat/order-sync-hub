@@ -27,7 +27,8 @@ ordersRouter
   .route('/')
   .post(async (req, res) => {
     const { items } = createOrderBody.parse(req.body);
-    res.status(201).json(await createOrder(items));
+    const order = await createOrder(items);
+    res.status(201).location(`${req.baseUrl}/${order.id}`).json(order);
   })
   .all(methodNotAllowed('POST'));
 

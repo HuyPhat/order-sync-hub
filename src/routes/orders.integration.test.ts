@@ -34,7 +34,9 @@ describe('POST /orders then GET /orders/:id', () => {
     expect(created.body).toMatchObject({ status: 'pending', total: '40.28' });
     expect(created.body.items).toHaveLength(2);
 
-    const fetched = await request(app).get(`/orders/${created.body.id}`);
+    // The Location header is a working link to the order just created.
+    expect(created.headers['location']).toBe(`/orders/${created.body.id}`);
+    const fetched = await request(app).get(created.headers['location']!);
 
     expect(fetched.status).toBe(200);
     // POST promises no item order; GET sorts by id. Sort POST's items to compare like with like.

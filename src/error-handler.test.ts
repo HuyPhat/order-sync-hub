@@ -1,5 +1,16 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import request from 'supertest';
+import {
+  AccessDeniedError,
+  ConnectionAcquireTimeoutError,
+  ConnectionError,
+  ConnectionRefusedError,
+  ConnectionTimedOutError,
+  DatabaseError,
+  HostNotFoundError,
+  HostNotReachableError,
+  InvalidConnectionError,
+} from 'sequelize';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { errorHandler } from './error-handler.js';
@@ -82,6 +93,45 @@ describe('errorHandler: framework 4xx errors without an expose flag', () => {
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ status: 'error', message: 'Bad Request' });
     expect(res.text).not.toMatch(/secret/);
+  });
+});
+
+describe('errorHandler: database unreachable', () => {
+  const cause = new Error('secret: connect ECONNREFUSED 10.0.0.5:3306');
+
+  it.each([
+    ['ConnectionRefusedError', new ConnectionRefusedError(cause)],
+    ['ConnectionTimedOutError', new ConnectionTimedOutError(cause)],
+    ['HostNotReachableError', new HostNotReachableError(cause)],
+    ['HostNotFoundError', new HostNotFoundError(cause)],
+    ['ConnectionAcquireTimeoutError', new ConnectionAcquireTimeoutError(cause)],
+    ['a plain ConnectionError', new ConnectionError(cause)],
+  ])('%s is a 503 with Retry-After and a fixed body', async (_name, error) => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await request(appThatThrows(error)).get('/boom');
+    expect(res.status).toBe(503);
+    expect(res.headers['retry-after']).toBe('5');
+    expect(res.body).toEqual({ status: 'error', message: 'Service Unavailable' });
+    expect(res.text).not.toMatch(/secret|ECONNREFUSED|10\.0\.0\.5/);
+    expect(logged).toHaveBeenCalledWith('Database unreachable:', error);
+  });
+
+  it.each([
+    [
+      'AccessDeniedError (our credentials are wrong; a retry cannot help)',
+      new AccessDeniedError(cause),
+    ],
+    ['InvalidConnectionError', new InvalidConnectionError(cause)],
+    [
+      'a DatabaseError (a query failed mid-flight; the write may have happened)',
+      new DatabaseError(Object.assign(cause, { sql: 'INSERT INTO orders ...' })),
+    ],
+  ])('%s stays a 500 without Retry-After', async (_name, error) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await request(appThatThrows(error)).get('/boom');
+    expect(res.status).toBe(500);
+    expect(res.headers['retry-after']).toBeUndefined();
+    expect(res.body).toEqual({ status: 'error', message: 'Internal Server Error' });
   });
 });
 

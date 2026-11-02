@@ -4,6 +4,9 @@ import { errorHandler, methodNotAllowed, notFound } from './error-handler.js';
 import { ordersRouter } from './routes/orders.js';
 const app: Express = express();
 
+// Don't announce the framework in every response, including the 404, 405 and error ones.
+app.disable('x-powered-by');
+
 app
   .route('/health')
   .get((_req, res) => {

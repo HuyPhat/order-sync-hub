@@ -15,6 +15,16 @@ describe('GET /health', () => {
     expect(res.headers['content-type']).toMatch(/application\/json/);
   });
 
+  it('does not send X-Powered-By, on success, 404 or 405', async () => {
+    for (const res of [
+      await request(app).get('/health'),
+      await request(app).get('/nope'),
+      await request(app).post('/health'),
+    ]) {
+      expect(res.headers['x-powered-by']).toBeUndefined();
+    }
+  });
+
   it('answers HEAD with 200 and no body', async () => {
     const res = await request(app).head('/health');
     expect(res.status).toBe(200);
