@@ -53,6 +53,23 @@ describe('createShutdown', () => {
     expect(closeDb).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps sweeping idle connections while the close is pending, then leaves no timer', async () => {
+    let held: CloseCb | undefined;
+    const { deps, closeIdleConnections, exit } = makeDeps({ close: (cb) => (held = cb) });
+    const pending = createShutdown(deps)('SIGTERM');
+
+    await vi.advanceTimersByTimeAsync(100);
+    const afterFirstTick = closeIdleConnections.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(500);
+    expect(closeIdleConnections.mock.calls.length).toBeGreaterThan(1);
+    expect(closeIdleConnections.mock.calls.length).toBeGreaterThan(afterFirstTick);
+
+    held!();
+    await pending;
+    expect(exit).toHaveBeenCalledWith(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('ignores a second signal while shutting down', async () => {
     const { deps, close, closeDb, exit } = makeDeps();
     const shutdown = createShutdown(deps);

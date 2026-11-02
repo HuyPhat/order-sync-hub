@@ -4,6 +4,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.resetModules();
+  vi.doUnmock('./db/sequelize.js');
 });
 
 // Imports server.ts with app.listen mocked to report `outcome` to its callback, the way
@@ -12,7 +13,11 @@ async function startWith(outcome: Error | undefined, env: Record<string, string>
   vi.stubEnv('PORT', '4321');
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   vi.resetModules();
+  const dbClose = vi.fn().mockResolvedValue(undefined);
   const { default: app } = await import('./app.js');
+  // Registered after app.js (whose models need the real Sequelize) and before server.js, whose
+  // shutdown path imports ./db/sequelize.js lazily.
+  vi.doMock('./db/sequelize.js', () => ({ sequelize: { close: dbClose } }));
   const server = {
     close: vi.fn((cb: (e?: Error) => void) => cb()),
     closeIdleConnections: vi.fn(),
@@ -31,7 +36,7 @@ async function startWith(outcome: Error | undefined, env: Record<string, string>
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
   await import('./server.js');
-  return { log, error, warn, exit, server, handlers };
+  return { log, error, warn, exit, server, handlers, dbClose };
 }
 
 describe('server startup', () => {
@@ -68,10 +73,12 @@ describe('server shutdown', () => {
   });
 
   it('SIGTERM closes the server and exits 0', async () => {
-    const { handlers, server, exit } = await startWith(undefined);
+    const { handlers, server, exit, dbClose } = await startWith(undefined);
     handlers.SIGTERM?.();
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(0));
     expect(server.close).toHaveBeenCalledTimes(1);
+    expect(server.closeIdleConnections).toHaveBeenCalled();
+    expect(dbClose).toHaveBeenCalledTimes(1);
   });
 
   it('does not register handlers when listening fails', async () => {

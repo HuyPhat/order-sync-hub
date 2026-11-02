@@ -1,6 +1,7 @@
 import type { Server } from 'node:http';
 
 export const SHUTDOWN_TIMEOUT_MS = 10_000;
+const IDLE_SWEEP_MS = 100;
 
 export interface ShutdownDeps {
   server: Pick<Server, 'close' | 'closeIdleConnections'>;
@@ -34,10 +35,20 @@ export function createShutdown(deps: ShutdownDeps): (signal: string) => Promise<
 
     let failed = false;
 
-    const closeError = await new Promise<Error | undefined>((resolve) => {
-      server.close((err?: Error) => resolve(err));
-      server.closeIdleConnections();
-    });
+    // A keep-alive socket that finishes its request during the drain turns idle and would sit
+    // there until keepAliveTimeout, so keep sweeping until the close callback fires.
+    let sweep: ReturnType<typeof setInterval> | undefined;
+    let closeError: Error | undefined;
+    try {
+      closeError = await new Promise<Error | undefined>((resolve) => {
+        server.close((err?: Error) => resolve(err));
+        server.closeIdleConnections();
+        sweep = setInterval(() => server.closeIdleConnections(), IDLE_SWEEP_MS);
+        sweep.unref();
+      });
+    } finally {
+      clearInterval(sweep);
+    }
     if (closeError) {
       failed = true;
       log(`Error closing server: ${closeError.message}`);

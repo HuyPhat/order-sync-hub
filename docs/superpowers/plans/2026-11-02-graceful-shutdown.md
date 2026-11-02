@@ -20,7 +20,7 @@
 
 ## Review Focus
 
-- A second signal during shutdown (impatient Ctrl-C twice): ignored, no second close, no early exit.
+- A second signal during shutdown: a second signal of a *different* kind is ignored by the `shuttingDown` guard (no second close); a second identical signal is deliberately not intercepted (`process.once`), so it force-quits via Node's default - conventional for double Ctrl-C.
 - Idle keep-alive sockets: must not hold the process open until the deadline (`closeIdleConnections`).
 - `server.close` reporting an error (e.g. server was not running): DB still closed, exit `1`.
 - `sequelize.close()` rejecting: logged, exit `1`, never hangs.
@@ -69,7 +69,7 @@
   Run: `pnpm vitest run src/shutdown.test.ts`
   Expected: FAIL, cannot resolve `./shutdown.js`.
 
-- [ ] **Step 3: Implement `createShutdown`** in `src/shutdown.ts`. Keep a `shuttingDown` flag (second call returns immediately). Log `Received <signal>, shutting down...`. Start `setTimeout(() => { log('Shutdown timed out'); exit(1); }, timeoutMs)` and `.unref()` it. Wrap `server.close(cb)` in a Promise that resolves with the callback's error (not rejecting), call `server.closeIdleConnections()` right after `close`. Then `await closeDb()` in try/catch (log the message, remember failure). `clearTimeout`, then `exit(failed ? 1 : 0)`. Ensure `exit` is called at most once (the timeout path and the normal path must not both fire: guard with a `done` flag).
+- [ ] **Step 3: Implement `createShutdown`** in `src/shutdown.ts`. Keep a `shuttingDown` flag (second call returns immediately). Log `Received <signal>, shutting down...`. Start `setTimeout(() => { log('Shutdown timed out'); exit(1); }, timeoutMs)` and `.unref()` it. Wrap `server.close(cb)` in a Promise that resolves with the callback's error (not rejecting), call `server.closeIdleConnections()` right after `close`, then keep sweeping with `setInterval(() => server.closeIdleConnections(), 100)` (unref'd, cleared when the close callback fires or on any other exit path) so keep-alive sockets that go idle during the drain do not wait for keepAliveTimeout. Then `await closeDb()` in try/catch (log the message, remember failure). `clearTimeout`, then `exit(failed ? 1 : 0)`. Ensure `exit` is called at most once (the timeout path and the normal path must not both fire: guard with a `done` flag).
 
 - [ ] **Step 4: Run to verify it passes.**
   Run: `pnpm vitest run src/shutdown.test.ts`

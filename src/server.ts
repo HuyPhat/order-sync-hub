@@ -41,6 +41,7 @@ const server = app.listen(config.port, (error?: Error) => {
       });
       void shutdown(signal);
     };
+    // `once` is deliberate: a second identical signal falls through to Node's default and force-quits.
     process.once('SIGTERM', () => onSignal('SIGTERM'));
     process.once('SIGINT', () => onSignal('SIGINT'));
   }
