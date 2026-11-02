@@ -1,7 +1,13 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sequelize } from '../db/sequelize.js';
 import { Order, OrderItem, Product } from '../models/index.js';
-import { InvalidOrderError, ProductNotFoundError, createOrder } from './orders.js';
+import {
+  InvalidOrderError,
+  OrderNotFoundError,
+  ProductNotFoundError,
+  createOrder,
+  getOrder,
+} from './orders.js';
 
 // Runs against the TEST database (see vitest.integration.config.ts), never the dev database.
 async function counts() {
@@ -136,5 +142,28 @@ describe('createOrder', () => {
     const free = await Product.create({ sku: 'F-1', name: 'Free', price: '0.00' });
     const order = await createOrder([{ productId: free.id, quantity: 4294967295 }]);
     expect(order.items?.[0]?.quantity).toBe(4294967295);
+  });
+});
+
+describe('getOrder', () => {
+  it('returns the saved order with its items sorted by id', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
+    const gadget = await Product.create({ sku: 'G-1', name: 'Gadget', price: '0.10' });
+    const created = await createOrder([
+      { productId: gadget.id, quantity: 3 },
+      { productId: widget.id, quantity: 2 },
+    ]);
+
+    const found = await getOrder(created.id);
+
+    expect(found.id).toBe(created.id);
+    expect(found.total).toBe('40.28');
+    const ids = found.items?.map((item) => item.id) ?? [];
+    expect(ids).toHaveLength(2);
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+  });
+
+  it('throws OrderNotFoundError for an id that does not exist', async () => {
+    await expect(getOrder(999999)).rejects.toBeInstanceOf(OrderNotFoundError);
   });
 });
