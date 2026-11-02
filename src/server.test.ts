@@ -13,16 +13,25 @@ async function startWith(outcome: Error | undefined, env: Record<string, string>
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   vi.resetModules();
   const { default: app } = await import('./app.js');
+  const server = {
+    close: vi.fn((cb: (e?: Error) => void) => cb()),
+    closeIdleConnections: vi.fn(),
+  };
   vi.spyOn(app, 'listen').mockImplementation(((_port: number, cb: (e?: Error) => void) => {
     cb(outcome);
-    return {} as never;
+    return server as never;
+  }) as never);
+  const handlers: Record<string, () => void> = {};
+  vi.spyOn(process, 'once').mockImplementation(((event: string, fn: () => void) => {
+    handlers[event] = fn;
+    return process;
   }) as never);
   const log = vi.spyOn(console, 'log').mockImplementation(() => {});
   const error = vi.spyOn(console, 'error').mockImplementation(() => {});
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
   await import('./server.js');
-  return { log, error, warn, exit };
+  return { log, error, warn, exit, server, handlers };
 }
 
 describe('server startup', () => {
@@ -49,6 +58,29 @@ describe('server startup', () => {
     expect(error).toHaveBeenCalledWith(expect.stringContaining('permission denied'));
     expect(exit).toHaveBeenCalledWith(1);
     expect(log).not.toHaveBeenCalled();
+  });
+});
+
+describe('server shutdown', () => {
+  it('registers SIGTERM and SIGINT handlers', async () => {
+    const { handlers } = await startWith(undefined);
+    expect(Object.keys(handlers)).toEqual(expect.arrayContaining(['SIGTERM', 'SIGINT']));
+  });
+
+  it('SIGTERM closes the server and exits 0', async () => {
+    const { handlers, server, exit } = await startWith(undefined);
+    handlers.SIGTERM?.();
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(0));
+    expect(server.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not register handlers when listening fails', async () => {
+    const busy = Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDRINUSE' });
+    const { handlers, server, exit } = await startWith(busy);
+    expect(Object.keys(handlers)).toEqual([]);
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(server.close).not.toHaveBeenCalled();
   });
 });
 
