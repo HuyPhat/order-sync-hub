@@ -1,3 +1,4 @@
+import { IdempotencyKey } from './idempotency-key.js';
 import { Order } from './order.js';
 import { OrderItem } from './order-item.js';
 import { Product } from './product.js';
@@ -8,5 +9,5 @@ Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items' });
 OrderItem.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
 OrderItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 
-export { Order, OrderItem, Product };
+export { IdempotencyKey, Order, OrderItem, Product };
 export type { OrderStatus } from './order.js';
