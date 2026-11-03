@@ -223,6 +223,26 @@ describe('POST /orders with an Idempotency-Key header', () => {
     expect(createOrderMock).not.toHaveBeenCalled();
   });
 
+  it('names the Idempotency-Key header in the issues of a bad key', async () => {
+    const res = await request(app)
+      .post('/orders')
+      .set('Idempotency-Key', 'has space')
+      .send({ items });
+    expect(res.status).toBe(400);
+    expect(res.body.issues).toEqual([
+      { path: 'Idempotency-Key', message: expect.stringContaining('1 to 64') },
+    ]);
+  });
+
+  it('rejects two keys joined into one header value (a repeated header) with 400', async () => {
+    const res = await request(app)
+      .post('/orders')
+      .set('Idempotency-Key', 'key-1, key-2')
+      .send({ items });
+    expect(res.status).toBe(400);
+    expect(createOrderOnceMock).not.toHaveBeenCalled();
+  });
+
   it('accepts a 64 character key', async () => {
     createOrderOnceMock.mockResolvedValue({ order: savedOrder, created: true });
     const key = 'a'.repeat(64);

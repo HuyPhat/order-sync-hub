@@ -17,10 +17,14 @@ const createOrderBody = z.strictObject({
 
 // Optional. 1..64 printable ASCII characters, case-sensitive, so a key never needs trimming or
 // normalising before it is stored or compared.
-const idempotencyKey = z
-  .string()
-  .regex(/^[\x21-\x7e]{1,64}$/)
-  .optional();
+// Wrapped in an object keyed by the header name, so a bad key is reported as an issue at
+// `Idempotency-Key` instead of at an empty path.
+const idempotencyHeader = z.object({
+  'Idempotency-Key': z
+    .string()
+    .regex(/^[\x21-\x7e]{1,64}$/, 'Must be 1 to 64 printable ASCII characters')
+    .optional(),
+});
 
 // Path ids arrive as text: digits only, then converted and range-checked.
 const orderId = z.string().regex(/^\d+$/).transform(Number).pipe(positiveInt);
@@ -34,7 +38,9 @@ ordersRouter
   .route('/')
   .post(async (req, res) => {
     // The header is checked first, so a bad key is rejected before the body is looked at.
-    const key = idempotencyKey.parse(req.get('Idempotency-Key'));
+    const { 'Idempotency-Key': key } = idempotencyHeader.parse({
+      'Idempotency-Key': req.get('Idempotency-Key'),
+    });
     const { items } = createOrderBody.parse(req.body);
     if (key === undefined) {
       const order = await createOrder(items);
