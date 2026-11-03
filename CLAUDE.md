@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Package manager is pnpm; CI runs Node 24. Source is ESM TypeScript: relative imports need the `.js` suffix (`import { x } from './x.js'`).
 
 ```bash
-pnpm dev                      # tsx watch src/server.ts (PORT defaults to 3000)
+pnpm dev                      # tsx watch with --env-file=.env (needs .env; PORT defaults to 3000)
 pnpm typecheck                # tsc --noEmit
 pnpm format / format:check    # prettier on src (single quotes, width 100)
 pnpm build / start            # tsc -p tsconfig.build.json -> dist/, node dist/server.js
