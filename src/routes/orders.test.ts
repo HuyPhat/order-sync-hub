@@ -2,10 +2,12 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import app from '../app.js';
 import {
+  IdempotencyKeyReusedError,
   InvalidOrderError,
   OrderNotFoundError,
   ProductNotFoundError,
   createOrder,
+  createOrderOnce,
   getOrder,
 } from '../services/orders.js';
 
@@ -14,10 +16,12 @@ import {
 vi.mock('../services/orders.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../services/orders.js')>()),
   createOrder: vi.fn(),
+  createOrderOnce: vi.fn(),
   getOrder: vi.fn(),
 }));
 
 const createOrderMock = vi.mocked(createOrder);
+const createOrderOnceMock = vi.mocked(createOrderOnce);
 const getOrderMock = vi.mocked(getOrder);
 
 // What res.json receives is whatever the service returns; a plain object is enough here.
@@ -30,6 +34,7 @@ const savedOrder = {
 
 beforeEach(() => {
   createOrderMock.mockReset();
+  createOrderOnceMock.mockReset();
   getOrderMock.mockReset();
 });
 
@@ -163,6 +168,76 @@ describe('POST /orders', () => {
     expect(res.text).not.toMatch(/order_sync_hub|Table/);
     expect(logged).toHaveBeenCalled();
     logged.mockRestore();
+  });
+});
+
+describe('POST /orders with an Idempotency-Key header', () => {
+  const items = [{ productId: 3, quantity: 2 }];
+
+  it('without the header it calls createOrder and never createOrderOnce', async () => {
+    createOrderMock.mockResolvedValue(savedOrder);
+    const res = await request(app).post('/orders').send({ items });
+    expect(res.status).toBe(201);
+    expect(createOrderMock).toHaveBeenCalledWith(items);
+    expect(createOrderOnceMock).not.toHaveBeenCalled();
+  });
+
+  it('with a key and created: true it answers 201 with Location', async () => {
+    createOrderOnceMock.mockResolvedValue({ order: savedOrder, created: true });
+    const res = await request(app).post('/orders').set('Idempotency-Key', 'key-1').send({ items });
+    expect(res.status).toBe(201);
+    expect(res.headers['location']).toBe('/orders/1');
+    expect(res.body).toEqual(JSON.parse(JSON.stringify(savedOrder)));
+    expect(createOrderOnceMock).toHaveBeenCalledWith('key-1', items);
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
+
+  it('with a key and created: false it answers 200 with the same body and Location', async () => {
+    createOrderOnceMock.mockResolvedValue({ order: savedOrder, created: false });
+    const res = await request(app).post('/orders').set('Idempotency-Key', 'key-1').send({ items });
+    expect(res.status).toBe(200);
+    expect(res.headers['location']).toBe('/orders/1');
+    expect(res.body).toEqual(JSON.parse(JSON.stringify(savedOrder)));
+  });
+
+  it('answers 422 when createOrderOnce throws IdempotencyKeyReusedError', async () => {
+    createOrderOnceMock.mockRejectedValue(new IdempotencyKeyReusedError());
+    const res = await request(app).post('/orders').set('Idempotency-Key', 'key-1').send({ items });
+    expect(res.status).toBe(422);
+    expect(res.body).toEqual({
+      status: 'error',
+      message: 'Idempotency-Key was already used with a different request',
+    });
+  });
+
+  it.each([
+    ['an empty key', ''],
+    ['a 65 character key', 'a'.repeat(65)],
+    ['a key with a space', 'has space'],
+    ['a key with a non-ASCII character', 'café'],
+  ])('rejects %s with 400 and calls no service', async (_label, key) => {
+    const res = await request(app).post('/orders').set('Idempotency-Key', key).send({ items });
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ status: 'error', message: 'Invalid request' });
+    expect(createOrderOnceMock).not.toHaveBeenCalled();
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a 64 character key', async () => {
+    createOrderOnceMock.mockResolvedValue({ order: savedOrder, created: true });
+    const key = 'a'.repeat(64);
+    const res = await request(app).post('/orders').set('Idempotency-Key', key).send({ items });
+    expect(res.status).toBe(201);
+    expect(createOrderOnceMock).toHaveBeenCalledWith(key, items);
+  });
+
+  it('rejects an invalid body with a valid key as 400 without calling the service', async () => {
+    const res = await request(app)
+      .post('/orders')
+      .set('Idempotency-Key', 'key-1')
+      .send({ items: [] });
+    expect(res.status).toBe(400);
+    expect(createOrderOnceMock).not.toHaveBeenCalled();
   });
 });
 

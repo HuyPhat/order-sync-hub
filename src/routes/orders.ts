@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
 import { methodNotAllowed } from '../error-handler.js';
-import { createOrder, getOrder } from '../services/orders.js';
+import { createOrder, createOrderOnce, getOrder } from '../services/orders.js';
 
 // Shape only. The quantity and total ceilings, and merging repeated products, stay in the service.
 const MAX_LINES = 100;
@@ -15,6 +15,13 @@ const createOrderBody = z.strictObject({
     .max(MAX_LINES),
 });
 
+// Optional. 1..64 printable ASCII characters, case-sensitive, so a key never needs trimming or
+// normalising before it is stored or compared.
+const idempotencyKey = z
+  .string()
+  .regex(/^[\x21-\x7e]{1,64}$/)
+  .optional();
+
 // Path ids arrive as text: digits only, then converted and range-checked.
 const orderId = z.string().regex(/^\d+$/).transform(Number).pipe(positiveInt);
 
@@ -26,9 +33,18 @@ ordersRouter.use(express.json());
 ordersRouter
   .route('/')
   .post(async (req, res) => {
+    // The header is checked first, so a bad key is rejected before the body is looked at.
+    const key = idempotencyKey.parse(req.get('Idempotency-Key'));
     const { items } = createOrderBody.parse(req.body);
-    const order = await createOrder(items);
-    res.status(201).location(`${req.baseUrl}/${order.id}`).json(order);
+    if (key === undefined) {
+      const order = await createOrder(items);
+      return void res.status(201).location(`${req.baseUrl}/${order.id}`).json(order);
+    }
+    const { order, created } = await createOrderOnce(key, items);
+    res
+      .status(created ? 201 : 200)
+      .location(`${req.baseUrl}/${order.id}`)
+      .json(order);
   })
   .all(methodNotAllowed('POST'));
 
