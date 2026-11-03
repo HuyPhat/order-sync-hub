@@ -1,0 +1,363 @@
+{
+  "client": "Thunder Client",
+  "collectionName": "order-sync-hub: Idempotency-Key",
+  "dateExported": "2026-11-03T08:11:40.000Z",
+  "version": "1.2",
+  "folders": [],
+  "requests": [
+    {
+      "_id": "7618a01a-aed8-4ef4-b163-42989846dade",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "01 Khong co key -> 201 (moi lan tao mot don moi)",
+      "url": "http://localhost:3000/orders",
+      "method": "POST",
+      "sortNum": 10000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 2\n    }\n  ]\n}",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "201"
+        }
+      ]
+    },
+    {
+      "_id": "03e1df78-64c3-45c5-ba3d-66b5ee9333ce",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "02 Key moi demo-1 -> 201 + Location",
+      "url": "http://localhost:3000/orders",
+      "method": "POST",
+      "sortNum": 20000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "demo-1"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 2\n    }\n  ]\n}",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "201"
+        }
+      ]
+    },
+    {
+      "_id": "ca37a26b-a4b9-4095-850a-353a3da1ae61",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "03 Gui lai demo-1, cung noi dung -> 200 (replay, khong tao don)",
+      "url": "http://localhost:3000/orders",
+      "method": "POST",
+      "sortNum": 30000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "demo-1"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 2\n    }\n  ]\n}",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "200"
+        }
+      ]
+    },
+    {
+      "_id": "d9f29fb6-7d7e-4b62-bb78-312b5c48ea75",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "04 demo-1 nhung doi so luong -> 422",
+      "url": "http://localhost:3000/orders",
+      "method": "POST",
+      "sortNum": 40000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "demo-1"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 5\n    }\n  ]\n}",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "422"
+        }
+      ]
+    },
+    {
+      "_id": "227534fe-d19d-48ea-b774-9841dfede7ee",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "05 demo-1, dong bi tach doi (1+1 = 2) -> 200 (van la replay)",
+      "url": "http://localhost:3000/orders",
+      "method": "POST",
+      "sortNum": 50000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "demo-1"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 1\n    },\n    {\n      \"productId\": 1,\n      \"quantity\": 1\n    }\n  ]\n}",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "200"
+        }
+      ]
+    },
+    {
+      "_id": "95e4144e-bd9e-47a1-b098-460450635105",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "06 Key sai (co dau cach) -> 400, issue nam o Idempotency-Key",
+      "url": "http://localhost:3000/orders",
+      "method": "POST",
+      "sortNum": 60000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "co dau cach"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 2\n    }\n  ]\n}",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "400"
+        }
+      ]
+    },
+    {
+      "_id": "304d14ed-ea84-4af0-9b44-2ce2b14da7c2",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "07 DEMO-1 (khac hoa/thuong) -> 201 (la key khac)",
+      "url": "http://localhost:3000/orders",
+      "method": "POST",
+      "sortNum": 70000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "DEMO-1"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 2\n    }\n  ]\n}",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "201"
+        }
+      ]
+    },
+    {
+      "_id": "3de4d35e-500c-484d-b6d3-284d6dffee6c",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "08 San pham khong ton tai -> 422 (khong ton key demo-fail)",
+      "url": "http://localhost:3000/orders",
+      "method": "POST",
+      "sortNum": 80000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Idempotency-Key",
+          "value": "demo-fail"
+        }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"items\": [\n    {\n      \"productId\": 999999,\n      \"quantity\": 1\n    }\n  ]\n}",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "422"
+        }
+      ]
+    },
+    {
+      "_id": "3eba8335-343e-4b68-afd8-2c32003805c5",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "09 Lay don theo id (doi 1 thanh id that) -> 200",
+      "url": "http://localhost:3000/orders/1",
+      "method": "GET",
+      "sortNum": 90000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [],
+      "params": [],
+      "body": {
+        "type": "none",
+        "raw": "",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "200"
+        }
+      ]
+    },
+    {
+      "_id": "8d446958-793f-4139-92f1-2e7ec36185ff",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "10 Health (khong can database) -> 200",
+      "url": "http://localhost:3000/health",
+      "method": "GET",
+      "sortNum": 100000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [],
+      "params": [],
+      "body": {
+        "type": "none",
+        "raw": "",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "200"
+        }
+      ]
+    },
+    {
+      "_id": "b10796a4-48da-42d7-83fc-69c1be032ce3",
+      "colId": "b7b0cab1-0263-41f3-b514-009affc1d628",
+      "containerId": "",
+      "name": "11 Health DB (can MySQL) -> 200",
+      "url": "http://localhost:3000/health/db",
+      "method": "GET",
+      "sortNum": 110000,
+      "created": "2026-11-03T08:11:40.000Z",
+      "modified": "2026-11-03T08:11:40.000Z",
+      "headers": [],
+      "params": [],
+      "body": {
+        "type": "none",
+        "raw": "",
+        "form": []
+      },
+      "tests": [
+        {
+          "type": "res-code",
+          "custom": "",
+          "action": "equal",
+          "value": "200"
+        }
+      ]
+    }
+  ]
+}
