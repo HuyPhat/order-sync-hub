@@ -1,11 +1,13 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sequelize } from '../db/sequelize.js';
-import { Order, OrderItem, Product } from '../models/index.js';
+import { IdempotencyKey, Order, OrderItem, Product } from '../models/index.js';
 import {
+  IdempotencyKeyReusedError,
   InvalidOrderError,
   OrderNotFoundError,
   ProductNotFoundError,
   createOrder,
+  createOrderOnce,
   getOrder,
 } from './orders.js';
 
@@ -19,6 +21,7 @@ async function counts() {
 }
 
 beforeEach(async () => {
+  await IdempotencyKey.destroy({ where: {} });
   await OrderItem.destroy({ where: {} });
   await Order.destroy({ where: {} });
   await Product.destroy({ where: {} });
@@ -142,6 +145,133 @@ describe('createOrder', () => {
     const free = await Product.create({ sku: 'F-1', name: 'Free', price: '0.00' });
     const order = await createOrder([{ productId: free.id, quantity: 4294967295 }]);
     expect(order.items?.[0]?.quantity).toBe(4294967295);
+  });
+});
+
+describe('createOrderOnce', () => {
+  it('creates the order and reports created: true', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '5.00' });
+    const result = await createOrderOnce('k1', [{ productId: widget.id, quantity: 2 }]);
+    expect(result.created).toBe(true);
+    expect(result.order.total).toBe('10.00');
+    expect(await IdempotencyKey.count()).toBe(1);
+  });
+
+  it('a repeat with the same key and lines returns the same order id, created: false, and no new rows', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '5.00' });
+    const lines = [{ productId: widget.id, quantity: 2 }];
+    const first = await createOrderOnce('k1', lines);
+    const before = await counts();
+
+    const second = await createOrderOnce('k1', lines);
+
+    expect(second.created).toBe(false);
+    expect(second.order.id).toBe(first.order.id);
+    expect(second.order.items).toHaveLength(1);
+    expect(await counts()).toEqual(before);
+  });
+
+  it('a repeat whose lines are reordered or split into repeated lines is still a replay', async () => {
+    const p = await Product.create({ sku: 'P-1', name: 'P', price: '1.00' });
+    const q = await Product.create({ sku: 'Q-1', name: 'Q', price: '2.00' });
+    const first = await createOrderOnce('k1', [
+      { productId: p.id, quantity: 1 },
+      { productId: p.id, quantity: 2 },
+    ]);
+    const split = await createOrderOnce('k1', [{ productId: p.id, quantity: 3 }]);
+    expect(split).toMatchObject({ created: false });
+    expect(split.order.id).toBe(first.order.id);
+
+    const a = await createOrderOnce('k2', [
+      { productId: p.id, quantity: 1 },
+      { productId: q.id, quantity: 1 },
+    ]);
+    const b = await createOrderOnce('k2', [
+      { productId: q.id, quantity: 1 },
+      { productId: p.id, quantity: 1 },
+    ]);
+    expect(b.created).toBe(false);
+    expect(b.order.id).toBe(a.order.id);
+  });
+
+  it('the same key with different lines throws IdempotencyKeyReusedError and creates nothing', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '5.00' });
+    await createOrderOnce('k1', [{ productId: widget.id, quantity: 2 }]);
+    const before = await counts();
+
+    const attempt = createOrderOnce('k1', [{ productId: widget.id, quantity: 3 }]);
+
+    await expect(attempt).rejects.toBeInstanceOf(IdempotencyKeyReusedError);
+    await expect(attempt).rejects.toThrow(
+      'Idempotency-Key was already used with a different request',
+    );
+    expect(await counts()).toEqual(before);
+  });
+
+  it('keys that differ only in case are different keys', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '5.00' });
+    const lines = [{ productId: widget.id, quantity: 1 }];
+    const upper = await createOrderOnce('Ab', lines);
+    const lower = await createOrderOnce('ab', lines);
+    expect(upper.created).toBe(true);
+    expect(lower.created).toBe(true);
+    expect(upper.order.id).not.toBe(lower.order.id);
+    expect(await Order.count()).toBe(2);
+  });
+
+  it('two concurrent identical calls create exactly one order', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '5.00' });
+    const lines = [{ productId: widget.id, quantity: 1 }];
+
+    // Hold both calls at their pre-check until both have looked (and found nothing), so the
+    // race really happens: both go on to insert and only the primary key can stop the loser.
+    const realFind = IdempotencyKey.findByPk.bind(IdempotencyKey);
+    let preChecks = 0;
+    let release: () => void = () => {};
+    const bothLooked = new Promise<void>((resolve) => (release = resolve));
+    const spy = vi.spyOn(IdempotencyKey, 'findByPk').mockImplementation((async (
+      ...args: unknown[]
+    ) => {
+      const row = await (realFind as (...a: unknown[]) => Promise<unknown>)(...args);
+      if (++preChecks <= 2) {
+        if (preChecks === 2) release();
+        await bothLooked;
+      }
+      return row;
+    }) as never);
+
+    const results = await Promise.all([
+      createOrderOnce('race', lines),
+      createOrderOnce('race', lines),
+    ]);
+
+    expect(spy.mock.calls.length).toBeGreaterThanOrEqual(3); // the loser re-read after the duplicate
+
+    expect(results[0].order.id).toBe(results[1].order.id);
+    expect(results.filter((r) => r.created)).toHaveLength(1);
+    expect(await Order.count()).toBe(1);
+    expect(await IdempotencyKey.count()).toBe(1);
+  });
+
+  it('a failed first attempt does not consume the key', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '5.00' });
+
+    await expect(
+      createOrderOnce('k1', [{ productId: widget.id + 999, quantity: 1 }]),
+    ).rejects.toBeInstanceOf(ProductNotFoundError);
+    expect(await IdempotencyKey.count()).toBe(0);
+
+    const retry = await createOrderOnce('k1', [{ productId: widget.id, quantity: 1 }]);
+    expect(retry.created).toBe(true);
+    expect(await IdempotencyKey.count()).toBe(1);
+  });
+
+  it('invalid lines are rejected before any lookup', async () => {
+    await expect(createOrderOnce('k1', [])).rejects.toBeInstanceOf(InvalidOrderError);
+    await expect(createOrderOnce('k1', [{ productId: 1, quantity: 0 }])).rejects.toBeInstanceOf(
+      InvalidOrderError,
+    );
+    expect(await IdempotencyKey.count()).toBe(0);
   });
 });
 

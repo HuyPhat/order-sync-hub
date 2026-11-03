@@ -14,7 +14,12 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { errorHandler } from './error-handler.js';
-import { InvalidOrderError, OrderNotFoundError, ProductNotFoundError } from './services/orders.js';
+import {
+  IdempotencyKeyReusedError,
+  InvalidOrderError,
+  OrderNotFoundError,
+  ProductNotFoundError,
+} from './services/orders.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -37,6 +42,15 @@ function appThatThrows(error: unknown) {
 const zodError = z.strictObject({ items: z.array(z.number()) }).safeParse({ items: ['x'] }).error!;
 
 describe('errorHandler: known errors', () => {
+  it('maps IdempotencyKeyReusedError to 422 with its message', async () => {
+    const res = await request(appThatThrows(new IdempotencyKeyReusedError())).get('/boom');
+    expect(res.status).toBe(422);
+    expect(res.body).toEqual({
+      status: 'error',
+      message: 'Idempotency-Key was already used with a different request',
+    });
+  });
+
   it.each([
     ['InvalidOrderError', new InvalidOrderError('Invalid quantity: 0'), 400, 'Invalid quantity: 0'],
     ['ProductNotFoundError', new ProductNotFoundError([5, 7]), 422, 'Unknown product id(s): 5, 7'],

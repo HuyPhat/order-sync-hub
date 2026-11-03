@@ -2,11 +2,12 @@ import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import app from '../app.js';
 import { sequelize } from '../db/sequelize.js';
-import { Order, OrderItem, Product } from '../models/index.js';
+import { IdempotencyKey, Order, OrderItem, Product } from '../models/index.js';
 
 // Runs against the TEST database (see vitest.integration.config.ts): the real app, the real
 // service and real MySQL, with nothing mocked.
 beforeEach(async () => {
+  await IdempotencyKey.destroy({ where: {} });
   await OrderItem.destroy({ where: {} });
   await Order.destroy({ where: {} });
   await Product.destroy({ where: {} });
@@ -121,5 +122,71 @@ describe('GET /orders/:id for an order that does not exist', () => {
     const res = await request(app).get('/orders/999999');
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ status: 'error', message: 'Order not found' });
+  });
+});
+
+describe('POST /orders with an Idempotency-Key', () => {
+  it('a retry with the same key returns 200, the same order and one row', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
+    const send = () =>
+      request(app)
+        .post('/orders')
+        .set('Idempotency-Key', 'retry-1')
+        .send({ items: [{ productId: widget.id, quantity: 2 }] });
+
+    const first = await send();
+    const second = await send();
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(200);
+    expect(second.body).toEqual(first.body);
+    expect(second.headers['location']).toBe(first.headers['location']);
+    expect(await Order.count()).toBe(1);
+    expect(await IdempotencyKey.count()).toBe(1);
+  });
+
+  it('the same key with different items returns 422', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
+    const post = (quantity: number) =>
+      request(app)
+        .post('/orders')
+        .set('Idempotency-Key', 'reuse-1')
+        .send({ items: [{ productId: widget.id, quantity }] });
+
+    expect((await post(1)).status).toBe(201);
+    const res = await post(2);
+
+    expect(res.status).toBe(422);
+    expect(res.body).toEqual({
+      status: 'error',
+      message: 'Idempotency-Key was already used with a different request',
+    });
+    expect(await Order.count()).toBe(1);
+  });
+
+  it('bodies never contain idempotencyKey or requestHash', async () => {
+    const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
+    const send = () =>
+      request(app)
+        .post('/orders')
+        .set('Idempotency-Key', 'leak-1')
+        .send({ items: [{ productId: widget.id, quantity: 1 }] });
+
+    const first = await send();
+    const replay = await send();
+    const fetched = await request(app).get(`/orders/${first.body.id}`);
+
+    for (const res of [first, replay, fetched]) {
+      expect(res.text).not.toMatch(/idempotencyKey|requestHash/);
+    }
+  });
+
+  it('an invalid body with a valid key is 400 and stores no key', async () => {
+    const res = await request(app)
+      .post('/orders')
+      .set('Idempotency-Key', 'bad-body')
+      .send({ items: [] });
+    expect(res.status).toBe(400);
+    expect(await IdempotencyKey.count()).toBe(0);
   });
 });
