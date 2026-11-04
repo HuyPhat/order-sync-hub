@@ -120,11 +120,11 @@ The Ponytail plugin is also installed and runs on top of these: pick the smalles
 
 After finishing a task (checks green, before opening or merging its PR), ask the user whether to start a review; never start one unasked. If they agree, have a fresh agent review it: spawn one with the Agent tool and `model: "opus"` (Opus 5.5, stronger than the model that wrote the code, so it does not share its blind spots). Give it the range (`git diff origin/main...HEAD`), the task's acceptance criteria and what to focus on (for auth, money or migrations: security, races, data loss), and tell it to review only and change nothing. Triage the findings: fix the real ones, and say which were declined and why. Skip this for docs-only changes. The Karpathy skill has no review step of its own; `/code-review` is an optional extra.
 
-The superpowers plugin is no longer used, so there is no brainstorm -> spec -> plan workflow to follow. For a multi-step change, state a short plan with a verify step per item in the conversation; write a file under `docs/` only when asked.
+The superpowers plugin is no longer used, so there is no brainstorm -> spec -> plan workflow to follow. Agree the scope in conversation, then write the plan file described under Plans before coding.
 
 ## Plans
 
-Design specs live in `docs/superpowers/specs/` and implementation plans in `docs/superpowers/plans/` (dated, task-by-task). The directory name is historical, from when the superpowers plugin generated them; they are kept in place so existing cross-references still resolve. Read the relevant one before changing the area it covers.
+Before coding a task with more than one step, once its scope is agreed with the user, write the plan to `docs/plans/YYYY-MM-DD-<task>.md`: goal, facts and assumptions, decisions, numbered acceptance criteria, and numbered steps that each end in a verify check. Commit it with the work and tick steps off as they finish. Read the relevant plan before changing the area it covers. Plans and specs written under the superpowers plugin (`docs/superpowers/`) were removed; they are in git history.
 
 ### Known gaps
 
