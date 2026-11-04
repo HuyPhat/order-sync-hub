@@ -1,7 +1,7 @@
 # Orders: Migration, Models, Associations and `createOrder` — Design
 
 **Status:** Approved in conversation 2026-10-11; this document awaits the owner's review. No code has been written.
-**Next step after approval:** an implementation plan (`superpowers:writing-plans`).
+**Next step after approval:** an implementation plan.
 
 ## 1. Goal
 

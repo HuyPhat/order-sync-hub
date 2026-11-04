@@ -1,6 +1,6 @@
 # Orders HTTP Routes Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let a client place and read orders over HTTP: `POST /orders` and `GET /orders/:id`, with the body validated by zod and every failure answered with a predictable status code and no internal detail.
 

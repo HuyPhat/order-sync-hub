@@ -1,6 +1,6 @@
 # Fail Fast on a Missing MYSQL_PASSWORD Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** When `MYSQL_PASSWORD` is empty, say so in plain language at the point the database is actually needed, instead of surfacing `Access denied for user 'app' (using password: NO)` from deep inside mysql2.
 

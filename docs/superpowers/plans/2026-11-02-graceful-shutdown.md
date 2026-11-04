@@ -1,6 +1,6 @@
 # Graceful Shutdown Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** On SIGTERM or SIGINT the server stops accepting connections, lets in-flight requests finish, closes the Sequelize pool, then exits 0 (or exits 1 after a 10 s deadline).
 

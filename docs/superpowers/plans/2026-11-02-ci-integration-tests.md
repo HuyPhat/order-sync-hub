@@ -1,6 +1,6 @@
 # Run the Integration Tests in CI Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make GitHub Actions run `pnpm test:integration` against a real MySQL 8.4, so a broken migration `down`, a model/table mismatch or a non-atomic `createOrder` fails CI instead of passing silently.
 

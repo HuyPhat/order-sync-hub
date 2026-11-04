@@ -1,7 +1,7 @@
 # Stock Tracking: Ledger, Balance Counter, Reservation and Cancel — Design
 
 **Status:** Design approved in conversation 2026-10-13; this document awaits the owner's review. **Not implemented, and not to be implemented yet**: this is a design for later.
-**Next step after approval:** an implementation plan (`superpowers:writing-plans`).
+**Next step after approval:** an implementation plan.
 **Prerequisite:** the orders work (branch `feature/orders`: `orders`, `order_items`, `createOrder`) is merged to `main` first; this design extends it.
 
 ## 1. Goal

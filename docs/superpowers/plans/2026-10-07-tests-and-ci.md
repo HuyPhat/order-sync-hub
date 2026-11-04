@@ -1,6 +1,6 @@
 # Tests (supertest) and GitHub CI Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Get `order-sync-hub` compiling and running, cover every `src/*.ts` file with tests (HTTP tests via supertest), and add a GitHub Actions pipeline: typecheck -> test -> build -> deploy -> run `dist/server.js`.
 

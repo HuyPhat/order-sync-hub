@@ -100,9 +100,20 @@ Optional `Idempotency-Key` header (1-64 printable ASCII, case-sensitive). `creat
 - Shutdown and timer logic is tested with injected fakes and Vitest fake timers; `server.test.ts` mocks `app.listen` and captures `process.once` handlers instead of sending real signals.
 - `tsconfig.json` is strict with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`; test files are excluded from the build config but still typechecked.
 
+## Working style
+
+This project uses the Karpathy guidelines skill (`andrej-karpathy-skills:karpathy-guidelines`, installed as a Claude Code plugin); it loads automatically when writing, reviewing or refactoring code. In short:
+
+1. **Think before coding:** state assumptions, surface alternatives, ask when unclear.
+2. **Simplicity first:** the minimum code that solves the request; no speculative features or abstractions.
+3. **Surgical changes:** touch only what the request needs, match existing style, mention unrelated dead code instead of deleting it.
+4. **Goal-driven execution:** turn a task into a verifiable goal (a failing test first for bugs), then loop until `pnpm typecheck`, `pnpm format:check`, `pnpm test` and (for DB changes) `pnpm test:integration` pass.
+
+The superpowers plugin is no longer used, so there is no brainstorm -> spec -> plan workflow to follow. For a multi-step change, state a short plan with a verify step per item in the conversation; write a file under `docs/` only when asked.
+
 ## Plans
 
-Design specs live in `docs/superpowers/specs/` and implementation plans in `docs/superpowers/plans/` (dated, task-by-task). Read the relevant one before changing the area it covers.
+Design specs live in `docs/superpowers/specs/` and implementation plans in `docs/superpowers/plans/` (dated, task-by-task). The directory name is historical, from when the superpowers plugin generated them; they are kept in place so existing cross-references still resolve. Read the relevant one before changing the area it covers.
 
 ### Known gaps
 
