@@ -4,15 +4,12 @@ import {
   type CreationOptional,
   type InferAttributes,
   type InferCreationAttributes,
-  type NonAttribute,
 } from 'sequelize';
 import { sequelize } from '../db/sequelize.js';
-import type { Order } from './order.js';
-import type { Product } from './product.js';
 
 export class OrderItem extends Model<
-  InferAttributes<OrderItem, { omit: 'order' | 'product' }>,
-  InferCreationAttributes<OrderItem, { omit: 'order' | 'product' }>
+  InferAttributes<OrderItem>,
+  InferCreationAttributes<OrderItem>
 > {
   declare id: CreationOptional<number>;
   // Plain numbers on purpose: Sequelize's ForeignKey<> helper would make these optional when
@@ -24,9 +21,6 @@ export class OrderItem extends Model<
   declare unitPrice: string;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
-
-  declare order?: NonAttribute<Order>;
-  declare product?: NonAttribute<Product>;
 }
 
 OrderItem.init(

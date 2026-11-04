@@ -6,7 +6,6 @@ the app itself.
 | Script | What it checks | Needs MySQL? | Run by |
 |---|---|---|---|
 | [`smoke.sh`](#smokesh) | The built server boots and `/health` answers | No | CI (`run` job), by hand |
-| [`verify-product.ts`](#verify-productts) | The `Product` model works against the real `products` table | Yes | By hand |
 | [`check-health-db.sh`](#check-health-dbsh) | `/health/db` returns the right status when the database is broken in four ways | Yes (2 of 4 scenarios) | By hand |
 | [`create-test-db.sh`](#create-test-dbsh) | Creates the `order_sync_hub_test` database used by `pnpm test:integration` | Yes | Once, by hand |
 
@@ -43,44 +42,6 @@ health: {"status":"ok"}
 
 ---
 
-## verify-product.ts
-
-Round-trips a `Product` through the real database and compares the model with the table. Use it
-after changing the model or a migration, to catch the two drifting apart. Unit tests cannot do
-this because they never touch MySQL.
-
-```bash
-docker compose up -d
-pnpm exec tsx --env-file=.env scripts/verify-product.ts
-```
-
-Expected output:
-
-```
-id is number: true | createdAt is Date: true
-price read back: "19.99" | typeof: string
-table columns: ["createdAt","id","name","price","sku","updatedAt"]
-model attributes: ["createdAt","id","name","price","sku","updatedAt"]
-model matches table columns: true
-duplicate sku -> SequelizeUniqueConstraintError
-```
-
-What each line proves:
-
-- **`id` and `createdAt` types:** the database and Sequelize fill them in, and they come back as a
-  number and a `Date`.
-- **`price` is a string:** MySQL returns `DECIMAL` as text so no floating-point rounding appears.
-  Keep money as strings (or use a decimal library), never `Number()`.
-- **Columns match:** the model's attributes equal the table's columns. `false` means the model and
-  the migration disagree.
-- **Duplicate SKU:** the `UNIQUE` constraint on `sku` is enforced by the database.
-
-It runs everything inside a transaction that is **rolled back**, so no rows are left behind. It
-needs the `products` table to exist: run `pnpm db:migrate` first if it fails with
-a "Table ... doesn't exist" error. It is not type-checked by `pnpm typecheck` (that only covers
-`src/`), so run it after editing it.
-
----
 
 ## check-health-db.sh
 
@@ -200,6 +161,5 @@ pnpm test:integration
 | `.env not found` | Copy `.env.example` to `.env` and set the passwords. |
 | `MYSQL_PASSWORD is not set` (migration CLI or server startup) | The variable is empty or missing. Set it in `.env` (see `.env.example`) or the environment. Only `NODE_ENV` `development` and `test` let the server start without it (an unset `NODE_ENV` counts as `development`, so set it in deployments). |
 | `Something is already listening on port ...` | Another server uses that port. Use `PORT=3191 bash scripts/check-health-db.sh`. |
-| `verify-product.ts`: "Table ... doesn't exist" | Run `pnpm db:migrate`. |
-| `verify-product.ts` or the control scenario cannot connect | MySQL is not running or not healthy yet: `docker compose ps`. Check `MYSQL_PASSWORD` in `.env` matches the one the database volume was created with. |
+| The control scenario cannot connect | MySQL is not running or not healthy yet: `docker compose ps`. Check `MYSQL_PASSWORD` in `.env` matches the one the database volume was created with. |
 | Control scenario is slow (over 1 s) | First connection on a cold machine; rerun. |
