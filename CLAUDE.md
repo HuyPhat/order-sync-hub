@@ -118,6 +118,8 @@ This project uses the Karpathy guidelines skill (`andrej-karpathy-skills:karpath
 
 The Ponytail plugin is also installed and runs on top of these: pick the smallest solution that works (reuse existing helpers, stdlib, installed dependencies before new code) and mark a deliberate shortcut with a `ponytail:` comment naming its ceiling. Use `/ponytail-review` on a diff before merging, `/ponytail-audit` for a whole-repo pass, and `/ponytail-debt` to list open shortcuts before starting a roadmap step. It never overrides validation, `Decimal` money handling, transactions or data-loss error handling; keep those complete.
 
+After finishing a task (checks green, before opening or merging its PR), ask the user whether to start a review; never start one unasked. If they agree, have a fresh agent review it: spawn one with the Agent tool and `model: "opus"` (Opus 5.5, stronger than the model that wrote the code, so it does not share its blind spots). Give it the range (`git diff origin/main...HEAD`), the task's acceptance criteria and what to focus on (for auth, money or migrations: security, races, data loss), and tell it to review only and change nothing. Triage the findings: fix the real ones, and say which were declined and why. Skip this for docs-only changes. The Karpathy skill has no review step of its own; `/code-review` is an optional extra.
+
 The superpowers plugin is no longer used, so there is no brainstorm -> spec -> plan workflow to follow. For a multi-step change, state a short plan with a verify step per item in the conversation; write a file under `docs/` only when asked.
 
 ## Plans
