@@ -42,11 +42,10 @@ ordersRouter
       'Idempotency-Key': req.get('Idempotency-Key'),
     });
     const { items } = createOrderBody.parse(req.body);
-    if (key === undefined) {
-      const order = await createOrder(items);
-      return void res.status(201).location(`${req.baseUrl}/${order.id}`).json(order);
-    }
-    const { order, created } = await createOrderOnce(key, items);
+    const { order, created } =
+      key === undefined
+        ? { order: await createOrder(items), created: true }
+        : await createOrderOnce(key, items);
     res
       .status(created ? 201 : 200)
       .location(`${req.baseUrl}/${order.id}`)

@@ -1,23 +1,12 @@
 import { sequelize } from './sequelize.js';
 
-// An unreachable host can block authenticate() for ~10s (mysql2's default connect timeout),
-// longer than most probes wait, so cap it ourselves.
-export async function checkDatabase(timeoutMs = 2000): Promise<boolean> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`database check timed out after ${timeoutMs}ms`)),
-      timeoutMs,
-    );
-  });
-
+// authenticate() gives up on an unreachable host after the 3s connectTimeout set in sequelize.ts.
+export async function checkDatabase(): Promise<boolean> {
   try {
-    await Promise.race([sequelize.authenticate(), timeout]);
+    await sequelize.authenticate();
     return true;
   } catch (error) {
     console.error('database health check failed:', error);
     return false;
-  } finally {
-    clearTimeout(timer);
   }
 }
