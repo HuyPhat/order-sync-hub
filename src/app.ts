@@ -1,6 +1,8 @@
 import express, { type Express } from 'express';
 import { checkDatabase } from './db/check.js';
+import { requireAuth, requireRole } from './auth/middleware.js';
 import { errorHandler, methodNotAllowed, notFound } from './error-handler.js';
+import { authRouter, usersRouter } from './routes/auth.js';
 import { ordersRouter } from './routes/orders.js';
 const app: Express = express();
 
@@ -26,7 +28,9 @@ app
   })
   .all(methodNotAllowed('GET', 'HEAD'));
 
-app.use('/orders', ordersRouter);
+app.use('/auth', authRouter);
+app.use('/users', requireAuth, requireRole('admin'), usersRouter);
+app.use('/orders', requireAuth, ordersRouter);
 
 // After every route, before errorHandler: a request nothing matched.
 app.use(notFound);

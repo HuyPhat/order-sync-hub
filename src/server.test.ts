@@ -66,6 +66,22 @@ describe('server startup', () => {
   });
 });
 
+describe('server startup without a JWT secret', () => {
+  it.each(['', 'x'.repeat(31)])('exits 1 for the secret %j outside test', async (secret) => {
+    const { error, exit } = await startWith(undefined, {
+      NODE_ENV: 'development',
+      JWT_SECRET: secret,
+    });
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('JWT_SECRET'));
+    expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it('starts in the test environment even with no secret', async () => {
+    const { exit } = await startWith(undefined, { NODE_ENV: 'test', JWT_SECRET: '' });
+    expect(exit).not.toHaveBeenCalled();
+  });
+});
+
 describe('server shutdown', () => {
   it('registers SIGTERM and SIGINT handlers', async () => {
     const { handlers } = await startWith(undefined);

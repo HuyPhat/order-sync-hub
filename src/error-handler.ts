@@ -2,12 +2,14 @@ import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { AccessDeniedError, ConnectionError, InvalidConnectionError } from 'sequelize';
 import { ZodError } from 'zod';
+import { ForbiddenError, UnauthorizedError } from './auth/errors.js';
 import {
   IdempotencyKeyReusedError,
   InvalidOrderError,
   OrderNotFoundError,
   ProductNotFoundError,
 } from './services/orders.js';
+import { EmailTakenError } from './services/users.js';
 
 // body-parser and Express's router throw errors that carry a 4xx status (a bad body, a URL that
 // cannot be decoded). Those are the client's mistake, so they pass through as that status, and only
@@ -76,6 +78,12 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
   if (err instanceof ProductNotFoundError) return send(422, err.message);
   if (err instanceof IdempotencyKeyReusedError) return send(422, err.message);
   if (err instanceof OrderNotFoundError) return send(404, 'Order not found');
+  if (err instanceof EmailTakenError) return send(422, err.message);
+  if (err instanceof UnauthorizedError) {
+    res.set('WWW-Authenticate', 'Bearer');
+    return send(401, err.message);
+  }
+  if (err instanceof ForbiddenError) return send(403, err.message);
   if (isClientError(err)) {
     return send(
       err.status,

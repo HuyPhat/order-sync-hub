@@ -3,7 +3,7 @@ import { UniqueConstraintError } from 'sequelize';
 import { afterAll, describe, expect, it } from 'vitest';
 import { config } from '../config.js';
 import { sequelize } from '../db/sequelize.js';
-import { IdempotencyKey, Order, OrderItem, Product } from './index.js';
+import { IdempotencyKey, Order, OrderItem, Product, User } from './index.js';
 
 afterAll(async () => {
   await sequelize.close();
@@ -23,6 +23,7 @@ const models: Array<[string, ModelStatic<Model>]> = [
   ['Order', Order],
   ['OrderItem', OrderItem],
   ['IdempotencyKey', IdempotencyKey],
+  ['User', User],
 ];
 
 describe('models match the migrated tables', () => {

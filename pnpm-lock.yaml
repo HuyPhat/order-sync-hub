@@ -172,6 +172,9 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1(supports-color@8.1.1)
+      jose:
+        specifier: ^6.2.15
+        version: 6.2.15
       mysql2:
         specifier: ^3.24.5
         version: 3.24.5(@types/node@26.6.4)
@@ -979,6 +982,9 @@ packages:
 
   jju@1.4.0:
     resolution: {integrity: sha512-8wb9Yw966OSxApiCt0K3yNJL8pnNeIv+OEq2YMidz4FKP6nonSRoOXc80iXY4JaN2FC11B9qsNmDsm+ZOfMROA==}
+
+  jose@6.2.15:
+    resolution: {integrity: sha512-qdF6ewcZARtef63fJ9AKKZPgxw+t7USH6HLXYcD4CrdmSvDp79rpJSPFEKc90QBeGS63u1KQtN2MZQHC0yDIzA==}
 
   jsonfile@4.0.0:
     resolution: {integrity: sha512-m6F1R3z8jjlf2imQHS2Qez5sjKWQzbuuhuJ/FKYFRZvPE3PuHcSMVZzfsLhGVOkfd20obL5SWEBew5ShlquNxg==}
@@ -2133,6 +2139,8 @@ snapshots:
   is-property@1.0.2: {}
 
   jju@1.4.0: {}
+
+  jose@6.2.15: {}
 
   jsonfile@4.0.0:
     optionalDependencies:

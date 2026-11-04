@@ -74,6 +74,13 @@ describe('config', () => {
     });
   });
 
+  it('reads JWT_SECRET, empty when unset', async () => {
+    vi.stubEnv('JWT_SECRET', 'x'.repeat(32));
+    expect((await loadConfig()).jwtSecret).toBe('x'.repeat(32));
+    vi.stubEnv('JWT_SECRET', '');
+    expect((await loadConfig()).jwtSecret).toBe('');
+  });
+
   it('throws for an invalid MYSQL_PORT', async () => {
     vi.stubEnv('MYSQL_PORT', 'abc');
     await expect(loadConfig()).rejects.toThrow(/Invalid MYSQL_PORT/);

@@ -1,8 +1,14 @@
 import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import app from '../app.js';
+import { signAccessToken } from '../auth/token.js';
 import { sequelize } from '../db/sequelize.js';
 import { IdempotencyKey, Order, OrderItem, Product } from '../models/index.js';
+
+// /orders sits behind requireAuth: every request below carries a valid staff token.
+const api = request
+  .agent(app)
+  .set('Authorization', `Bearer ${await signAccessToken({ id: 1, role: 'staff' })}`);
 
 // Runs against the TEST database (see vitest.integration.config.ts): the real app, the real
 // service and real MySQL, with nothing mocked.
@@ -22,14 +28,12 @@ describe('POST /orders then GET /orders/:id', () => {
     const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
     const gadget = await Product.create({ sku: 'G-1', name: 'Gadget', price: '0.10' });
 
-    const created = await request(app)
-      .post('/orders')
-      .send({
-        items: [
-          { productId: widget.id, quantity: 2 },
-          { productId: gadget.id, quantity: 3 },
-        ],
-      });
+    const created = await api.post('/orders').send({
+      items: [
+        { productId: widget.id, quantity: 2 },
+        { productId: gadget.id, quantity: 3 },
+      ],
+    });
 
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({ status: 'pending', total: '40.28' });
@@ -37,7 +41,7 @@ describe('POST /orders then GET /orders/:id', () => {
 
     // The Location header is a working link to the order just created.
     expect(created.headers['location']).toBe(`/orders/${created.body.id}`);
-    const fetched = await request(app).get(created.headers['location']!);
+    const fetched = await api.get(created.headers['location']!);
 
     expect(fetched.status).toBe(200);
     // POST promises no item order; GET sorts by id. Sort POST's items to compare like with like.
@@ -52,10 +56,10 @@ describe('POST /orders then GET /orders/:id', () => {
 describe('the fields a client receives', () => {
   it('are exactly these, so a column added later never reaches clients by accident', async () => {
     const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
-    const created = await request(app)
+    const created = await api
       .post('/orders')
       .send({ items: [{ productId: widget.id, quantity: 1 }] });
-    const fetched = await request(app).get(`/orders/${created.body.id}`);
+    const fetched = await api.get(`/orders/${created.body.id}`);
 
     for (const body of [created.body, fetched.body]) {
       expect(Object.keys(body).sort()).toEqual([
@@ -83,14 +87,12 @@ describe('POST /orders with an unknown product', () => {
   it('answers 422 and saves nothing', async () => {
     const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
 
-    const res = await request(app)
-      .post('/orders')
-      .send({
-        items: [
-          { productId: widget.id, quantity: 1 },
-          { productId: widget.id + 1000, quantity: 1 },
-        ],
-      });
+    const res = await api.post('/orders').send({
+      items: [
+        { productId: widget.id, quantity: 1 },
+        { productId: widget.id + 1000, quantity: 1 },
+      ],
+    });
 
     expect(res.status).toBe(422);
     expect(res.body).toEqual({
@@ -106,7 +108,7 @@ describe('POST /orders with a quantity the database column cannot hold', () => {
   it('answers 400 from the service rule (zod only checks the shape) and saves nothing', async () => {
     const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
 
-    const res = await request(app)
+    const res = await api
       .post('/orders')
       .send({ items: [{ productId: widget.id, quantity: 4294967296 }] });
 
@@ -119,7 +121,7 @@ describe('POST /orders with a quantity the database column cannot hold', () => {
 
 describe('GET /orders/:id for an order that does not exist', () => {
   it('answers 404', async () => {
-    const res = await request(app).get('/orders/999999');
+    const res = await api.get('/orders/999999');
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ status: 'error', message: 'Order not found' });
   });
@@ -129,7 +131,7 @@ describe('POST /orders with an Idempotency-Key', () => {
   it('a retry with the same key returns 200, the same order and one row', async () => {
     const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
     const send = () =>
-      request(app)
+      api
         .post('/orders')
         .set('Idempotency-Key', 'retry-1')
         .send({ items: [{ productId: widget.id, quantity: 2 }] });
@@ -148,7 +150,7 @@ describe('POST /orders with an Idempotency-Key', () => {
   it('the same key with different items returns 422', async () => {
     const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
     const post = (quantity: number) =>
-      request(app)
+      api
         .post('/orders')
         .set('Idempotency-Key', 'reuse-1')
         .send({ items: [{ productId: widget.id, quantity }] });
@@ -167,14 +169,14 @@ describe('POST /orders with an Idempotency-Key', () => {
   it('bodies never contain idempotencyKey or requestHash', async () => {
     const widget = await Product.create({ sku: 'W-1', name: 'Widget', price: '19.99' });
     const send = () =>
-      request(app)
+      api
         .post('/orders')
         .set('Idempotency-Key', 'leak-1')
         .send({ items: [{ productId: widget.id, quantity: 1 }] });
 
     const first = await send();
     const replay = await send();
-    const fetched = await request(app).get(`/orders/${first.body.id}`);
+    const fetched = await api.get(`/orders/${first.body.id}`);
 
     for (const res of [first, replay, fetched]) {
       expect(res.text).not.toMatch(/idempotencyKey|requestHash/);
@@ -182,10 +184,7 @@ describe('POST /orders with an Idempotency-Key', () => {
   });
 
   it('an invalid body with a valid key is 400 and stores no key', async () => {
-    const res = await request(app)
-      .post('/orders')
-      .set('Idempotency-Key', 'bad-body')
-      .send({ items: [] });
+    const res = await api.post('/orders').set('Idempotency-Key', 'bad-body').send({ items: [] });
     expect(res.status).toBe(400);
     expect(await IdempotencyKey.count()).toBe(0);
   });

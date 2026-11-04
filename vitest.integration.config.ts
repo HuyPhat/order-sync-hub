@@ -11,7 +11,10 @@ try {
 export default defineConfig({
   test: {
     include: ['src/**/*.integration.test.ts'],
-    env: { MYSQL_DATABASE: TEST_DATABASE },
+    env: {
+      MYSQL_DATABASE: TEST_DATABASE,
+      JWT_SECRET: 'test-only-secret-at-least-32-characters-long',
+    },
     globalSetup: ['./test/integration-setup.ts'],
     fileParallelism: false, // all files share one database
   },

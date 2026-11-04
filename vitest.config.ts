@@ -4,5 +4,6 @@ import { configDefaults, defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     exclude: [...configDefaults.exclude, '**/*.integration.test.ts'],
+    env: { JWT_SECRET: 'test-only-secret-at-least-32-characters-long' },
   },
 });

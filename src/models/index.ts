@@ -2,10 +2,11 @@ import { IdempotencyKey } from './idempotency-key.js';
 import { Order } from './order.js';
 import { OrderItem } from './order-item.js';
 import { Product } from './product.js';
+import { User } from './user.js';
 
 // Associations live here, in one place, so no model file has to import another at runtime.
 // Import models from this file whenever you need them associated.
 Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items' });
 
-export { IdempotencyKey, Order, OrderItem, Product };
+export { IdempotencyKey, Order, OrderItem, Product, User };
 export type { OrderStatus } from './order.js';
