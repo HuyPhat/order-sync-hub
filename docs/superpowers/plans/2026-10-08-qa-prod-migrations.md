@@ -1,6 +1,6 @@
 # QA + Production Migrations Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Apply database migrations safely to two environments, QA then production, from the same build artifact in CI, with a guard against accidental rollback in production.
 

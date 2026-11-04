@@ -9,7 +9,7 @@
 > - If the fail-fast plan (`2026-10-11-fail-fast-db-password.md`) is applied first, the password block sits before `app.listen` and the handlers after it; see its "Interactions" section. Recommended order: fail-fast first (small), then this plan.
 > - This plan already satisfies "`server.close()`, then `sequelize.close()`, with a timeout" (10 s; 2 s after a fatal error).
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the server stop cleanly on Ctrl+C / `SIGTERM` (finish in-flight requests, close the database pool, exit 0), answer unexpected request errors with a safe JSON 500, and exit 1 after fatal process-level errors.
 

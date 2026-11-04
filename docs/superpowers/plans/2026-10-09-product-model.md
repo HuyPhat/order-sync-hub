@@ -1,6 +1,6 @@
 # Product Model Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a `Product` Sequelize model for the existing `products` table, with TypeScript types that catch wrong shapes at compile time and a model that exactly matches the migration.
 
