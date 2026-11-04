@@ -9,7 +9,7 @@ Order Sync Hub is a backend portfolio project imitating the internal order-proce
 | Step | Area | Status |
 | --- | --- | --- |
 | 1-4 | Express/TS skeleton, MySQL + Sequelize + migrations, transactional orders, HTTP API | Done |
-| 5 | Authentication and roles | Planned (no design yet) |
+| 5 | Authentication and roles | 5a done (users, login, access token, roles, `/orders` protected); 5b planned (refresh tokens, login rate limit) |
 | 6 | Queue (BullMQ + Redis), mock Amazon polling | Planned |
 | 7 | Redis cache-aside | Planned |
 | 8 | Rate-limited external API (OpenAI-style, 429 backoff) | Planned |
@@ -35,9 +35,10 @@ pnpm test:integration         # real MySQL; same flags work (-t, file path)
 
 pnpm db:migrate | db:rollback | db:status            # load .env via --env-file
 pnpm db:create <name>.ts      # new migration file; pass the extension, e.g. add-x.ts
+read -rs PW; printf '%s' "$PW" | pnpm user:create <email> <admin|staff>   # password via stdin, never argv
 ```
 
-Environment variables: `PORT`, `MYSQL_HOST` (default `127.0.0.1`), `MYSQL_PORT` (3306), `MYSQL_DATABASE` (`order_sync_hub`), `MYSQL_USER` (`app`), `MYSQL_PASSWORD` (required outside `development`/`test`).
+Environment variables: `PORT`, `MYSQL_HOST` (default `127.0.0.1`), `MYSQL_PORT` (3306), `MYSQL_DATABASE` (`order_sync_hub`), `MYSQL_USER` (`app`), `MYSQL_PASSWORD` (required outside `development`/`test`), `JWT_SECRET` (at least 32 characters; the server refuses to start without it in every environment except `test`; `.env.example` has a placeholder, `openssl rand -base64 48` makes a real one).
 
 CI (`.github/workflows/ci.yml`) runs `typecheck` (typecheck + format:check) -> `test` and `integration` (MySQL 8.4 service) -> `build` -> `deploy`/`run` (main only, smoke-tests the built bundle with prod deps).
 
@@ -52,7 +53,8 @@ Express 5 app over Sequelize 6 / MySQL, split into layers that each own one deci
 - `src/app.ts` builds the Express app (exported, no `listen`); `src/server.ts` starts it. Route order matters: routers, then `notFound`, then `errorHandler` last.
 - `src/routes/orders.ts` only validates shape (zod) and picks a service call. `express.json()` is mounted on `/orders` only, so `/health` never fails on a bad body.
 - `src/services/orders.ts` holds the business rules: merging repeated products, quantity/total ceilings matching the column types, price snapshotting, and writing an order with its items in **one transaction** (products read with `LOCK IN SHARE MODE`). Money is `DECIMAL` handled as strings and summed with `decimal.js`, never JS numbers.
-- `src/error-handler.ts` is the single place that maps errors to HTTP: zod -> 400, `InvalidOrderError` -> 400, `ProductNotFoundError` / `IdempotencyKeyReusedError` -> 422, `OrderNotFoundError` -> 404, body-parser 4xx pass through with fixed messages, an *unreachable* database -> 503 + `Retry-After`. Everything else is a 500 that never leaks the message. A connection lost mid-query is deliberately a 500, not 503, because the write may have committed and a retry could duplicate the order.
+- `src/error-handler.ts` is the single place that maps errors to HTTP: zod -> 400, `InvalidOrderError` -> 400, `UnauthorizedError` -> 401 + `WWW-Authenticate: Bearer`, `ForbiddenError` -> 403, `ProductNotFoundError` / `IdempotencyKeyReusedError` / `EmailTakenError` -> 422, `OrderNotFoundError` -> 404, body-parser 4xx pass through with fixed messages, an *unreachable* database -> 503 + `Retry-After`. Everything else is a 500 that never leaks the message. A connection lost mid-query is deliberately a 500, not 503, because the write may have committed and a retry could duplicate the order.
+- `src/auth/` holds authentication. `password.ts` hashes with argon2id from `node:crypto` (PHC string, parameters stored in the hash, verified with `timingSafeEqual`). `token.ts` signs and verifies the HS256 access token with `jose` (15 min, claims `sub` = user id and `role`; only HS256 is accepted). `middleware.ts` has `requireAuth` (sets `req.user`) and `requireRole(...)`. `src/services/users.ts` holds `createUser` and `authenticate`; an unknown email is verified against a dummy hash so it takes as long as a wrong password. The role lives in the token, so a role change applies only after the old token expires.
 - `src/models/index.ts` is where associations are declared; import models from there, not from the individual files, so they are associated.
 - `src/shutdown.ts` + `server.ts`: on SIGTERM/SIGINT stop accepting connections, sweep idle keep-alive sockets, close Sequelize, exit 0; a 10 s deadline exits 1. Handlers use `process.once` on purpose (a second identical signal force-quits).
 
@@ -70,6 +72,7 @@ Express 5 app over Sequelize 6 / MySQL, split into layers that each own one deci
 - `products`: `id`, `sku` (unique), `name`, `price DECIMAL(10,2)`, timestamps.
 - `orders`: `id`, `status` (default `pending`), `total DECIMAL`, timestamps.
 - `order_items`: `id`, `orderId` (FK, `ON DELETE CASCADE`), `productId` (FK, `ON DELETE RESTRICT`), `quantity`, `unitPrice` (snapshot of the product price at order time), timestamps.
+- `users`: `id`, `email` (unique, stored lowercase), `passwordHash` (argon2id), `role` (`admin` or `staff`), timestamps.
 - `idempotency_keys`: see below.
 
 `orders` and `order_items` are separate migrations because MySQL DDL auto-commits, so a multi-statement migration cannot be atomic.
@@ -77,6 +80,9 @@ Express 5 app over Sequelize 6 / MySQL, split into layers that each own one deci
 ### HTTP API
 
 - `GET /health` -> `200 {"status":"ok"}`, no database. `GET /health/db` -> `200 {"status":"ok","db":"up"}` or `503 {"status":"error","db":"down"}`.
+- `POST /auth/login`: `{ email, password }` -> `200 { accessToken, expiresIn: 900 }`; a wrong password and an unknown email both give the same `401`. Public.
+- `POST /users` (admin only): `{ email, password (12-128 chars), role }` -> `201 { id, email, role }`, `422` for a registered email. There is no open signup; the first admin comes from `pnpm user:create`.
+- `/orders` and `/orders/:id` need `Authorization: Bearer <access token>` (any role): `401` without a valid token, never `403`. `/health`, `/health/db` and `/auth/login` stay public.
 - `POST /orders`: strict body `{ "items": [{ "productId": 1, "quantity": 2 }] }` (extra keys rejected), 1-100 lines, positive integers, same-product lines merged. Success: `201`, `Location: /orders/:id`, body is the order with `items`.
 - `GET /orders/:id` -> order with items sorted by id, or `404`.
 - Validation errors return `400` with `issues: [{path, message}]`; malformed JSON -> 400 "Invalid JSON"; body too large -> 413; unknown route -> 404 JSON; wrong method on a known route -> 405 JSON with `Allow` (OPTIONS -> 204); database unreachable -> 503 with `Retry-After: 5`; anything else -> 500 "Internal Server Error", logged.
@@ -94,6 +100,7 @@ Optional `Idempotency-Key` header (1-64 printable ASCII, case-sensitive). `creat
 
 ## Testing conventions
 
+- Both Vitest configs set a test `JWT_SECRET`. Tests of `/orders` sign a token with `signAccessToken` and use a `supertest` agent with the `Authorization` header preset.
 - `*.test.ts` run under `pnpm test` (`vitest.config.ts` excludes `*.integration.test.ts`). Route tests mock the service module but keep its real error classes (`importOriginal` spread), because the error handler uses `instanceof`.
 - Integration tests (`vitest.integration.config.ts`) run files serially against `order_sync_hub_test`. Global setup reverts **every** migration and re-applies them, and refuses to run unless the database name ends in `_test`. The test database name lives in `test/test-database.ts`; keep it in sync with `scripts/create-test-db.sh`.
 - Two rollback integration tests prove a mid-transaction failure leaves no partial order; they fail if `{ transaction }` is removed.
@@ -123,7 +130,7 @@ Design specs live in `docs/superpowers/specs/` and implementation plans in `docs
 
 ### Planned work
 
-- **Auth (step 5):** `users` and `refresh_tokens` tables; argon2id or bcrypt; short-lived JWT access token plus hashed, rotating refresh token with reuse detection; RBAC (401 not authenticated, 403 not allowed); login rate limit.
+- **Auth 5b (5a is done):** `refresh_tokens` table; opaque 7-day refresh token returned in the JSON body, stored only as a SHA-256 hash, rotated on use, with reuse detection that revokes the whole family; `POST /auth/refresh` and `/auth/logout`; in-memory login rate limit (429 + `Retry-After`; resets on restart, not shared across instances, so replace it when Redis arrives).
 - **Queue and sync (step 6):** mock "Amazon" API polled every N seconds with a `lastUpdatedAfter` cursor; BullMQ + Redis with retries, exponential backoff and a dead-letter queue; unique `amazonOrderId` so a repeated order is stored once; `OrderCreated` event with independent consumers (e.g. Lark-style webhook, inventory update).
 - **Cache (step 7):** Redis cache-aside on read-heavy endpoints with explicit invalidation.
 - **External API (step 8):** OpenAI-style call with 429 handling: backoff with jitter and a token bucket.

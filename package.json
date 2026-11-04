@@ -17,7 +17,8 @@
     "db:migrate": "tsx --env-file=.env src/db/migrate.ts up",
     "db:rollback": "tsx --env-file=.env src/db/migrate.ts down",
     "db:status": "tsx --env-file=.env src/db/migrate.ts pending",
-    "db:create": "tsx --env-file=.env src/db/migrate.ts create --name"
+    "db:create": "tsx --env-file=.env src/db/migrate.ts create --name",
+    "user:create": "tsx --env-file=.env src/auth/create-user.ts"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +26,7 @@
   "dependencies": {
     "decimal.js": "^10.6.0",
     "express": "^5.2.1",
+    "jose": "^6.2.15",
     "mysql2": "^3.24.5",
     "sequelize": "^6.37.8",
     "umzug": "^3.8.3",

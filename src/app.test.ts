@@ -1,7 +1,11 @@
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import app from './app.js';
+import { signAccessToken } from './auth/token.js';
 import { sequelize } from './db/sequelize.js';
+
+// /orders sits behind requireAuth; these tests are about routing, so they just carry a valid token.
+const bearer = `Bearer ${await signAccessToken({ id: 1, role: 'staff' })}`;
 
 describe('GET /health', () => {
   it('returns 200 and { status: "ok" }', async () => {
@@ -34,7 +38,7 @@ describe('GET /health', () => {
 
 describe('requests no route matches', () => {
   it.each(['/nope', '/orders/1/items', '/health/db/x'])('GET %s is a JSON 404', async (path) => {
-    const res = await request(app).get(path);
+    const res = await request(app).get(path).set('Authorization', bearer);
     expect(res.status).toBe(404);
     expect(res.headers['content-type']).toMatch(/application\/json/);
     expect(res.body).toEqual({ status: 'error', message: 'Not Found' });
@@ -52,7 +56,7 @@ describe('OPTIONS on a known path', () => {
     ['/orders', 'POST'],
     ['/orders/1', 'GET, HEAD'],
   ])('%s answers 204 and lists the allowed methods', async (path, allow) => {
-    const res = await request(app).options(path);
+    const res = await request(app).options(path).set('Authorization', bearer);
     expect(res.status).toBe(204);
     expect(res.headers['allow']).toBe(allow);
   });
@@ -67,7 +71,7 @@ describe('a known path with the wrong method is a JSON 405 with an Allow header'
     ['delete', '/orders/1', 'GET, HEAD'],
     ['post', '/orders/1', 'GET, HEAD'],
   ] as const)('%s %s', async (method, path, allow) => {
-    const res = await request(app)[method](path);
+    const res = await request(app)[method](path).set('Authorization', bearer);
     expect(res.status).toBe(405);
     expect(res.headers['allow']).toBe(allow);
     expect(res.headers['content-type']).toMatch(/application\/json/);

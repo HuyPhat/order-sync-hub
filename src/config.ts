@@ -13,6 +13,7 @@ function parsePort(raw: string | undefined, fallback: number, name = 'PORT', min
 export const config = {
   port: parsePort(process.env.PORT, 3000),
   nodeEnv: process.env.NODE_ENV || 'development',
+  jwtSecret: process.env.JWT_SECRET || '',
   // Same variable names docker-compose.yml uses, so .env is the single source.
   db: {
     host: process.env.MYSQL_HOST || '127.0.0.1',

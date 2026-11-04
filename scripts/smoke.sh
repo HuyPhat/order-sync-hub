@@ -4,6 +4,8 @@ set -euo pipefail
 
 PORT="${PORT:-3100}"
 export PORT
+# The server refuses to start without a signing secret; this one is only for the smoke test.
+export JWT_SECRET="${JWT_SECRET:-smoke-test-secret-at-least-32-characters}"
 
 node dist/server.js &
 SERVER_PID=$!

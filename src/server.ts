@@ -1,4 +1,5 @@
 import app from './app.js';
+import { jwtSecretProblem } from './auth/token.js';
 import { config } from './config.js';
 import { dbPasswordProblem } from './db/preflight.js';
 import { createShutdown } from './shutdown.js';
@@ -13,6 +14,14 @@ if (dbProblem) {
     console.error(`Refusing to start: ${dbProblem}`);
     process.exit(1);
   }
+}
+
+// Unlike the database password there is no useful way to run without it: nobody could log in.
+// Only the test environment, which sets its own secret, is let off.
+const jwtProblem = jwtSecretProblem(config.jwtSecret);
+if (jwtProblem && config.nodeEnv !== 'test') {
+  console.error(`Refusing to start: ${jwtProblem}`);
+  process.exit(1);
 }
 
 // Express 5 also calls this callback when listening fails, passing the error.
