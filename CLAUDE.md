@@ -109,6 +109,8 @@ This project uses the Karpathy guidelines skill (`andrej-karpathy-skills:karpath
 3. **Surgical changes:** touch only what the request needs, match existing style, mention unrelated dead code instead of deleting it.
 4. **Goal-driven execution:** turn a task into a verifiable goal (a failing test first for bugs), then loop until `pnpm typecheck`, `pnpm format:check`, `pnpm test` and (for DB changes) `pnpm test:integration` pass.
 
+The Ponytail plugin is also installed and runs on top of these: pick the smallest solution that works (reuse existing helpers, stdlib, installed dependencies before new code) and mark a deliberate shortcut with a `ponytail:` comment naming its ceiling. Use `/ponytail-review` on a diff before merging, `/ponytail-audit` for a whole-repo pass, and `/ponytail-debt` to list open shortcuts before starting a roadmap step. It never overrides validation, `Decimal` money handling, transactions or data-loss error handling; keep those complete.
+
 The superpowers plugin is no longer used, so there is no brainstorm -> spec -> plan workflow to follow. For a multi-step change, state a short plan with a verify step per item in the conversation; write a file under `docs/` only when asked.
 
 ## Plans
