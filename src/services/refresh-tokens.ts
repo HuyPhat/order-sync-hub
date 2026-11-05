@@ -9,7 +9,10 @@ export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 3600;
 // A client may send the same refresh token twice within moments (parallel requests that all got a
 // 401, a retry after a lost response). A token used less than this long ago is accepted again;
 // after that, seeing it means it was copied, so the whole family is revoked.
-// ponytail: inside the window a stolen token is also accepted; shrink it if clients single-flight.
+// ponytail: inside the window a copied token is also accepted, and the two children it creates are
+// separate branches that both live on for the whole session (nothing links them, so reuse across
+// branches is not detected). Shrink the window if clients single-flight; add a parentId column to
+// revoke siblings if this matters.
 export const REFRESH_GRACE_SECONDS = 10;
 
 // 32 random bytes are unguessable, so a fast hash is enough (no salt, no argon2) and it keeps the

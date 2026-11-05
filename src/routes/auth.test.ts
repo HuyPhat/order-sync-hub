@@ -189,6 +189,15 @@ describe('POST /auth/login rate limit', () => {
     expect((await login('someone-else@example.com')).status).toBe(401);
   });
 
+  it('does not count a server error, so an outage cannot lock users out', async () => {
+    authenticateMock.mockRejectedValue(new Error('database exploded'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    for (let i = 0; i < 8; i++) expect((await login('outage@example.com')).status).toBe(500);
+    authenticateMock.mockRejectedValue(new UnauthorizedError('Invalid credentials'));
+    expect((await login('outage@example.com')).status).toBe(401);
+    vi.restoreAllMocks();
+  });
+
   it('does not count invalid bodies', async () => {
     for (let i = 0; i < 8; i++) {
       expect(
@@ -261,5 +270,19 @@ describe('which routes need a token', () => {
 
   it.each(['/health'])('%s stays public', async (path) => {
     expect((await request(app).get(path)).status).toBe(200);
+  });
+});
+
+// Last on purpose: it uses up this file's refresh budget for the supertest IP.
+describe('POST /auth/refresh rate limit', () => {
+  it('answers 429 with Retry-After once an IP refreshes too often', async () => {
+    rotateMock.mockResolvedValue({ user: { id: 4, role: 'staff' }, refreshToken: 'next' });
+    let last = await request(app).post('/auth/refresh').send({ refreshToken: 'x' });
+    for (let i = 0; i < 40 && last.status === 200; i++) {
+      last = await request(app).post('/auth/refresh').send({ refreshToken: 'x' });
+    }
+    expect(last.status).toBe(429);
+    expect(Number(last.headers['retry-after'])).toBeGreaterThan(0);
+    expect(last.body).toEqual({ status: 'error', message: 'Too many requests' });
   });
 });

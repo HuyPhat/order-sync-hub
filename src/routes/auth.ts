@@ -1,6 +1,6 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
-import { loginLimiter } from '../auth/rate-limit.js';
+import { loginLimiter, refreshLimiter } from '../auth/rate-limit.js';
 import { methodNotAllowed } from '../error-handler.js';
 import { ACCESS_TOKEN_TTL_SECONDS, ROLES, signAccessToken, type AuthUser } from '../auth/token.js';
 import {
@@ -58,7 +58,7 @@ authRouter
 // Public: the refresh token is the credential.
 authRouter
   .route('/refresh')
-  .post(async (req, res) => {
+  .post(refreshLimiter, async (req, res) => {
     const { refreshToken } = refreshBody.parse(req.body);
     const rotated = await rotateRefreshToken(refreshToken);
     res.json(await sessionResponse(rotated.user, rotated.refreshToken));
