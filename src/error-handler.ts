@@ -2,7 +2,7 @@ import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { AccessDeniedError, ConnectionError, InvalidConnectionError } from 'sequelize';
 import { ZodError } from 'zod';
-import { ForbiddenError, UnauthorizedError } from './auth/errors.js';
+import { ForbiddenError, TooManyRequestsError, UnauthorizedError } from './auth/errors.js';
 import {
   IdempotencyKeyReusedError,
   InvalidOrderError,
@@ -84,6 +84,7 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
     return send(401, err.message);
   }
   if (err instanceof ForbiddenError) return send(403, err.message);
+  if (err instanceof TooManyRequestsError) return send(429, err.message);
   if (isClientError(err)) {
     return send(
       err.status,

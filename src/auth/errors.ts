@@ -9,3 +9,11 @@ export class ForbiddenError extends Error {
     super('Forbidden');
   }
 }
+
+// The Retry-After header is set by the rate limiter before this is raised.
+export class TooManyRequestsError extends Error {
+  override name = 'TooManyRequestsError';
+  constructor(message = 'Too many requests') {
+    super(message);
+  }
+}
