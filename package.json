@@ -26,6 +26,7 @@
   "dependencies": {
     "decimal.js": "^10.6.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.3",
     "jose": "^6.2.15",
     "mysql2": "^3.24.5",
     "sequelize": "^6.37.8",
